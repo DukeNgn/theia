@@ -1739,7 +1739,7 @@ export class ApplicationShell extends Widget {
      * Save but not formatting the current widget if it is dirty.
      */
     async saveWithoutFormatting(): Promise<void> {
-        await Saveable.save(this.currentWidget);
+        await Saveable.saveWithoutFormatting(this.currentWidget);
     }
 
     /**

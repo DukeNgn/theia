@@ -36,6 +36,7 @@ type ITextEditorModel = monaco.editor.ITextEditorModel;
 export interface WillSaveMonacoModelEvent {
     readonly model: MonacoEditorModel;
     readonly reason: TextDocumentSaveReason;
+    readonly skipFormatOnSave?: boolean;
     waitUntil(thenable: Thenable<monaco.editor.IIdentifiedSingleEditOperation[]>): void;
 }
 
@@ -283,8 +284,8 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         return this;
     }
 
-    save(): Promise<void> {
-        return this.scheduleSave(TextDocumentSaveReason.Manual);
+    save(skipFormatOnSave?: boolean): Promise<void> {
+        return this.scheduleSave(TextDocumentSaveReason.Manual, undefined, undefined, skipFormatOnSave);
     }
 
     protected pendingOperation = Promise.resolve();
@@ -397,8 +398,8 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         return this.saveCancellationTokenSource.token;
     }
 
-    protected scheduleSave(reason: TextDocumentSaveReason, token: CancellationToken = this.cancelSave(), overwriteEncoding?: boolean): Promise<void> {
-        return this.run(() => this.doSave(reason, token, overwriteEncoding));
+    protected scheduleSave(reason: TextDocumentSaveReason, token: CancellationToken = this.cancelSave(), overwriteEncoding?: boolean, skipFormatOnSave?: boolean): Promise<void> {
+        return this.run(() => this.doSave(reason, token, overwriteEncoding, skipFormatOnSave));
     }
 
     protected ignoreContentChanges = false;
@@ -457,12 +458,12 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         }
     }
 
-    protected async doSave(reason: TextDocumentSaveReason, token: CancellationToken, overwriteEncoding?: boolean): Promise<void> {
+    protected async doSave(reason: TextDocumentSaveReason, token: CancellationToken, overwriteEncoding?: boolean, skipFormatOnSave?: boolean): Promise<void> {
         if (token.isCancellationRequested || !this.resource.saveContents) {
             return;
         }
 
-        await this.fireWillSaveModel(reason, token);
+        await this.fireWillSaveModel(reason, token, skipFormatOnSave);
         if (token.isCancellationRequested) {
             return;
         }
@@ -496,7 +497,7 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         }
     }
 
-    protected async fireWillSaveModel(reason: TextDocumentSaveReason, token: CancellationToken): Promise<void> {
+    protected async fireWillSaveModel(reason: TextDocumentSaveReason, token: CancellationToken, skipFormatOnSave?: boolean): Promise<void> {
         type EditContributor = Thenable<monaco.editor.IIdentifiedSingleEditOperation[]>;
 
         const firing = this.onWillSaveModelEmitter.sequence(async listener => {
@@ -507,7 +508,7 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
             const { version } = this;
 
             const event = {
-                model: this, reason,
+                model: this, reason, skipFormatOnSave,
                 waitUntil: (thenable: EditContributor) => {
                     if (Object.isFrozen(waitables)) {
                         throw new Error('waitUntil cannot be called asynchronously.');

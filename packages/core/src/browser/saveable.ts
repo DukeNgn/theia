@@ -93,6 +93,13 @@ export namespace Saveable {
             await saveable.save();
         }
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    export async function saveWithoutFormatting(arg: any): Promise<void> {
+        const saveable = get(arg);
+        if (saveable) {
+            await saveable.save();
+        }
+    }
     export function apply(widget: Widget): SaveableWidget | undefined {
         if (SaveableWidget.is(widget)) {
             return widget;
