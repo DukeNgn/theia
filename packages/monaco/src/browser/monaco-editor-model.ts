@@ -284,8 +284,12 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         return this;
     }
 
-    save(skipFormatOnSave?: boolean): Promise<void> {
-        return this.scheduleSave(TextDocumentSaveReason.Manual, undefined, undefined, skipFormatOnSave);
+    save(): Promise<void> {
+        return this.scheduleSave(TextDocumentSaveReason.Manual);
+    }
+
+    saveWithoutFormatting(): Promise<void> {
+        return this.scheduleSave(TextDocumentSaveReason.Manual, undefined, undefined, true);
     }
 
     protected pendingOperation = Promise.resolve();
