@@ -14,28 +14,29 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { injectable, inject, optional, postConstruct } from 'inversify';
-import { ArrayExt, find, toArray, each } from '@phosphor/algorithm';
+import { ArrayExt, each, find, toArray } from '@phosphor/algorithm';
+import { IDragEvent } from '@phosphor/dragdrop';
+import { Message } from '@phosphor/messaging';
 import { Signal } from '@phosphor/signaling';
 import {
     BoxLayout, BoxPanel, DockLayout, DockPanel, FocusTracker, Layout, Panel, SplitLayout,
-    SplitPanel, TabBar, Widget, Title
+    SplitPanel, TabBar, Title, Widget
 } from '@phosphor/widgets';
-import { Message } from '@phosphor/messaging';
-import { IDragEvent } from '@phosphor/dragdrop';
-import { RecursivePartial, Event as CommonEvent, DisposableCollection, Disposable } from '../../common';
-import { animationFrame } from '../browser';
-import { Saveable, SaveableWidget } from '../saveable';
-import { StatusBarImpl, StatusBarEntry, StatusBarAlignment } from '../status-bar/status-bar';
-import { TheiaDockPanel, BOTTOM_AREA_ID, MAIN_AREA_ID } from './theia-dock-panel';
-import { SidePanelHandler, SidePanel, SidePanelHandlerFactory } from './side-panel-handler';
-import { TabBarRendererFactory, TabBarRenderer, SHELL_TABBAR_CONTEXT_MENU, ScrollableTabBar, ToolbarAwareTabBar } from './tab-bars';
-import { SplitPositionHandler, SplitPositionOptions } from './split-panels';
-import { FrontendApplicationStateService } from '../frontend-application-state';
-import { TabBarToolbarRegistry, TabBarToolbarFactory, TabBarToolbar } from './tab-bar-toolbar';
-import { ContextKeyService } from '../context-key-service';
+import { inject, injectable, optional, postConstruct } from 'inversify';
+import { Disposable, DisposableCollection, Event as CommonEvent, RecursivePartial } from '../../common';
 import { Emitter } from '../../common/event';
-import { waitForRevealed, waitForClosed } from '../widgets';
+import { animationFrame } from '../browser';
+import { SaveOptions } from '../common-frontend-contribution';
+import { ContextKeyService } from '../context-key-service';
+import { FrontendApplicationStateService } from '../frontend-application-state';
+import { Saveable, SaveableWidget } from '../saveable';
+import { StatusBarAlignment, StatusBarEntry, StatusBarImpl } from '../status-bar/status-bar';
+import { waitForClosed, waitForRevealed } from '../widgets';
+import { SidePanel, SidePanelHandler, SidePanelHandlerFactory } from './side-panel-handler';
+import { SplitPositionHandler, SplitPositionOptions } from './split-panels';
+import { TabBarToolbar, TabBarToolbarFactory, TabBarToolbarRegistry } from './tab-bar-toolbar';
+import { ScrollableTabBar, SHELL_TABBAR_CONTEXT_MENU, TabBarRenderer, TabBarRendererFactory, ToolbarAwareTabBar } from './tab-bars';
+import { BOTTOM_AREA_ID, MAIN_AREA_ID, TheiaDockPanel } from './theia-dock-panel';
 
 /** The class name added to ApplicationShell instances. */
 const APPLICATION_SHELL_CLASS = 'theia-ApplicationShell';
@@ -1731,8 +1732,8 @@ export class ApplicationShell extends Widget {
     /**
      * Save the current widget if it is dirty.
      */
-    async save(): Promise<void> {
-        await Saveable.save(this.currentWidget);
+    async save(options?: SaveOptions): Promise<void> {
+        await Saveable.save(this.currentWidget, options);
     }
 
     /**
@@ -1746,7 +1747,7 @@ export class ApplicationShell extends Widget {
      * Save all dirty widgets.
      */
     async saveAll(): Promise<void> {
-        await Promise.all(this.tracker.widgets.map(Saveable.save));
+        await Promise.all(this.tracker.widgets.map(widget => Saveable.save(widget)));
     }
 
     /**

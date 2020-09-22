@@ -17,41 +17,41 @@
 /* eslint-disable max-len, @typescript-eslint/indent */
 
 import debounce = require('lodash.debounce');
-import { injectable, inject } from 'inversify';
 import { TabBar, Widget } from '@phosphor/widgets';
-import { MAIN_MENU_BAR, SETTINGS_MENU, MenuContribution, MenuModelRegistry, ACCOUNTS_MENU } from '../common/menu';
-import { KeybindingContribution, KeybindingRegistry } from './keybinding';
-import { FrontendApplication, FrontendApplicationContribution } from './frontend-application';
-import { CommandContribution, CommandRegistry, Command } from '../common/command';
-import { UriAwareCommandHandler } from '../common/uri-command-handler';
-import { SelectionService } from '../common/selection-service';
-import { MessageService } from '../common/message-service';
-import { OpenerService, open } from '../browser/opener-service';
-import { ApplicationShell } from './shell/application-shell';
-import { SHELL_TABBAR_CONTEXT_MENU } from './shell/tab-bars';
-import { AboutDialog } from './about-dialog';
-import * as browser from './browser';
-import URI from '../common/uri';
-import { ContextKeyService } from './context-key-service';
-import { OS, isOSX, isWindows } from '../common/os';
-import { ResourceContextKey } from './resource-context-key';
-import { UriSelection } from '../common/selection';
-import { StorageService } from './storage-service';
-import { Navigatable } from './navigatable';
-import { QuickViewService } from './quick-view-service';
-import { PrefixQuickOpenService, QuickOpenItem, QuickOpenMode, QuickOpenService, QuickOpenGroupItem } from './quick-open';
 import { environment } from '@theia/application-package/lib/environment';
-import { IconThemeService } from './icon-theme-service';
-import { ColorContribution } from './color-application-contribution';
-import { ColorRegistry, Color } from './color-registry';
-import { CorePreferences } from './core-preferences';
-import { ThemeService } from './theming';
-import { PreferenceService, PreferenceScope } from './preferences';
-import { ClipboardService } from './clipboard-service';
-import { EncodingRegistry } from './encoding-registry';
+import { inject, injectable } from 'inversify';
+import { open, OpenerService } from '../browser/opener-service';
+import { Command, CommandContribution, CommandRegistry } from '../common/command';
 import { UTF8 } from '../common/encodings';
 import { EnvVariablesServer } from '../common/env-variables';
+import { ACCOUNTS_MENU, MAIN_MENU_BAR, MenuContribution, MenuModelRegistry, SETTINGS_MENU } from '../common/menu';
+import { MessageService } from '../common/message-service';
+import { isOSX, isWindows, OS } from '../common/os';
+import { UriSelection } from '../common/selection';
+import { SelectionService } from '../common/selection-service';
+import URI from '../common/uri';
+import { UriAwareCommandHandler } from '../common/uri-command-handler';
+import { AboutDialog } from './about-dialog';
 import { AuthenticationService } from './authentication-service';
+import * as browser from './browser';
+import { ClipboardService } from './clipboard-service';
+import { ColorContribution } from './color-application-contribution';
+import { Color, ColorRegistry } from './color-registry';
+import { ContextKeyService } from './context-key-service';
+import { CorePreferences } from './core-preferences';
+import { EncodingRegistry } from './encoding-registry';
+import { FrontendApplication, FrontendApplicationContribution } from './frontend-application';
+import { IconThemeService } from './icon-theme-service';
+import { KeybindingContribution, KeybindingRegistry } from './keybinding';
+import { Navigatable } from './navigatable';
+import { PreferenceScope, PreferenceService } from './preferences';
+import { PrefixQuickOpenService, QuickOpenGroupItem, QuickOpenItem, QuickOpenMode, QuickOpenService } from './quick-open';
+import { QuickViewService } from './quick-view-service';
+import { ResourceContextKey } from './resource-context-key';
+import { ApplicationShell } from './shell/application-shell';
+import { SHELL_TABBAR_CONTEXT_MENU } from './shell/tab-bars';
+import { StorageService } from './storage-service';
+import { ThemeService } from './theming';
 
 export namespace CommonMenus {
 
@@ -83,6 +83,10 @@ export namespace CommonMenus {
     // last menu item
     export const HELP = [...MAIN_MENU_BAR, '9_help'];
 
+}
+
+export interface SaveOptions {
+    readonly skipFormattingOnSave: boolean;
 }
 
 export namespace CommonCommands {
@@ -229,6 +233,11 @@ export namespace CommonCommands {
         id: 'core.save',
         category: FILE_CATEGORY,
         label: 'Save',
+    };
+    export const SAVE_WITHOUT_FORMATTING: Command = {
+        id: 'core.saveWithoutFormatting',
+        category: FILE_CATEGORY,
+        label: 'Save without Formatting',
     };
     export const SAVE_ALL: Command = {
         id: 'core.saveAll',
@@ -444,6 +453,9 @@ export class CommonFrontendContribution implements FrontendApplicationContributi
 
         registry.registerMenuAction(CommonMenus.FILE_SAVE, {
             commandId: CommonCommands.SAVE.id
+        });
+        registry.registerMenuAction(CommonMenus.FILE_SAVE, {
+            commandId: CommonCommands.SAVE_WITHOUT_FORMATTING.id
         });
         registry.registerMenuAction(CommonMenus.FILE_SAVE, {
             commandId: CommonCommands.SAVE_ALL.id
@@ -747,6 +759,9 @@ export class CommonFrontendContribution implements FrontendApplicationContributi
         commandRegistry.registerCommand(CommonCommands.SAVE, {
             execute: () => this.shell.save()
         });
+        commandRegistry.registerCommand(CommonCommands.SAVE_WITHOUT_FORMATTING, {
+            execute: () => this.shell.save({ skipFormattingOnSave: true })
+        });
         commandRegistry.registerCommand(CommonCommands.SAVE_ALL, {
             execute: () => this.shell.saveAll()
         });
@@ -923,6 +938,10 @@ export class CommonFrontendContribution implements FrontendApplicationContributi
             {
                 command: CommonCommands.SAVE.id,
                 keybinding: 'ctrlcmd+s'
+            },
+            {
+                command: CommonCommands.SAVE_WITHOUT_FORMATTING.id,
+                keybinding: 'ctrlcmd+k s'
             },
             {
                 command: CommonCommands.SAVE_ALL.id,

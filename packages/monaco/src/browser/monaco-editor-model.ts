@@ -14,18 +14,18 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { Position } from 'vscode-languageserver-types';
-import { TextDocumentSaveReason, TextDocumentContentChangeEvent } from 'vscode-languageserver-protocol';
-import { TextEditorDocument, EncodingMode } from '@theia/editor/lib/browser';
-import { DisposableCollection, Disposable } from '@theia/core/lib/common/disposable';
-import { Emitter, Event } from '@theia/core/lib/common/event';
-import { CancellationTokenSource, CancellationToken } from '@theia/core/lib/common/cancellation';
-import { Resource, ResourceError, ResourceVersion } from '@theia/core/lib/common/resource';
-import { Range } from 'vscode-languageserver-types';
 import { Saveable } from '@theia/core/lib/browser/saveable';
+import { CancellationToken, CancellationTokenSource } from '@theia/core/lib/common/cancellation';
+import { Disposable, DisposableCollection } from '@theia/core/lib/common/disposable';
+import { Emitter, Event } from '@theia/core/lib/common/event';
+import { ILogger, Log, Loggable } from '@theia/core/lib/common/logger';
+import { Resource, ResourceError, ResourceVersion } from '@theia/core/lib/common/resource';
+import { SaveOptions } from '@theia/core/src/browser/common-frontend-contribution';
+import { EncodingMode, TextEditorDocument } from '@theia/editor/lib/browser';
+import { TextDocumentContentChangeEvent, TextDocumentSaveReason } from 'vscode-languageserver-protocol';
+import { Position, Range } from 'vscode-languageserver-types';
 import { MonacoToProtocolConverter } from './monaco-to-protocol-converter';
 import { ProtocolToMonacoConverter } from './protocol-to-monaco-converter';
-import { ILogger, Loggable, Log } from '@theia/core/lib/common/logger';
 
 export {
     TextDocumentSaveReason
@@ -36,6 +36,7 @@ type ITextEditorModel = monaco.editor.ITextEditorModel;
 export interface WillSaveMonacoModelEvent {
     readonly model: MonacoEditorModel;
     readonly reason: TextDocumentSaveReason;
+    readonly options?: SaveOptions;
     waitUntil(thenable: Thenable<monaco.editor.IIdentifiedSingleEditOperation[]>): void;
 }
 
@@ -283,8 +284,8 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         return this;
     }
 
-    save(): Promise<void> {
-        return this.scheduleSave(TextDocumentSaveReason.Manual);
+    save(options?: SaveOptions): Promise<void> {
+        return this.scheduleSave(TextDocumentSaveReason.Manual, undefined, undefined, options);
     }
 
     protected pendingOperation = Promise.resolve();
@@ -397,8 +398,8 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         return this.saveCancellationTokenSource.token;
     }
 
-    protected scheduleSave(reason: TextDocumentSaveReason, token: CancellationToken = this.cancelSave(), overwriteEncoding?: boolean): Promise<void> {
-        return this.run(() => this.doSave(reason, token, overwriteEncoding));
+    protected scheduleSave(reason: TextDocumentSaveReason, token: CancellationToken = this.cancelSave(), overwriteEncoding?: boolean, options?: SaveOptions): Promise<void> {
+        return this.run(() => this.doSave(reason, token, overwriteEncoding, options));
     }
 
     protected ignoreContentChanges = false;
@@ -457,12 +458,12 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         }
     }
 
-    protected async doSave(reason: TextDocumentSaveReason, token: CancellationToken, overwriteEncoding?: boolean): Promise<void> {
+    protected async doSave(reason: TextDocumentSaveReason, token: CancellationToken, overwriteEncoding?: boolean, options?: SaveOptions): Promise<void> {
         if (token.isCancellationRequested || !this.resource.saveContents) {
             return;
         }
 
-        await this.fireWillSaveModel(reason, token);
+        await this.fireWillSaveModel(reason, token, options);
         if (token.isCancellationRequested) {
             return;
         }
@@ -496,7 +497,7 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
         }
     }
 
-    protected async fireWillSaveModel(reason: TextDocumentSaveReason, token: CancellationToken): Promise<void> {
+    protected async fireWillSaveModel(reason: TextDocumentSaveReason, token: CancellationToken, options?: SaveOptions): Promise<void> {
         type EditContributor = Thenable<monaco.editor.IIdentifiedSingleEditOperation[]>;
 
         const firing = this.onWillSaveModelEmitter.sequence(async listener => {
@@ -507,7 +508,7 @@ export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
             const { version } = this;
 
             const event = {
-                model: this, reason,
+                model: this, reason, options,
                 waitUntil: (thenable: EditContributor) => {
                     if (Object.isFrozen(waitables)) {
                         throw new Error('waitUntil cannot be called asynchronously.');

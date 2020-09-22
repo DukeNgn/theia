@@ -15,12 +15,17 @@
  ********************************************************************************/
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import URI from '@theia/core/lib/common/uri';
-import { EditorPreferenceChange, EditorPreferences, TextEditor, DiffNavigator } from '@theia/editor/lib/browser';
+import { ContributionProvider, OS } from '@theia/core';
+import { KeybindingRegistry, open, OpenerService, WidgetOpenerOptions } from '@theia/core/lib/browser';
 import { DiffUris } from '@theia/core/lib/browser/diff-uris';
+import { HttpOpenHandlerOptions } from '@theia/core/lib/browser/http-open-handler';
+import { deepClone, Disposable, DisposableCollection } from '@theia/core/lib/common';
+import { ApplicationServer } from '@theia/core/lib/common/application-protocol';
+import URI from '@theia/core/lib/common/uri';
+import { DiffNavigator, EditorPreferenceChange, EditorPreferences, TextEditor } from '@theia/editor/lib/browser';
 import { inject, injectable, named } from 'inversify';
-import { DisposableCollection, deepClone, Disposable, } from '@theia/core/lib/common';
 import { TextDocumentSaveReason } from 'vscode-languageserver-protocol';
+import { MonacoBulkEditService } from './monaco-bulk-edit-service';
 import { MonacoCommandServiceFactory } from './monaco-command-service';
 import { MonacoContextMenuService } from './monaco-context-menu';
 import { MonacoDiffEditor } from './monaco-diff-editor';
@@ -29,18 +34,13 @@ import { MonacoEditor, MonacoEditorServices } from './monaco-editor';
 import { MonacoEditorModel, WillSaveMonacoModelEvent } from './monaco-editor-model';
 import { MonacoEditorService } from './monaco-editor-service';
 import { MonacoQuickOpenService } from './monaco-quick-open-service';
+import { MonacoResolvedKeybinding } from './monaco-resolved-keybinding';
 import { MonacoTextModelService } from './monaco-text-model-service';
+import { MonacoToProtocolConverter } from './monaco-to-protocol-converter';
 import { MonacoWorkspace } from './monaco-workspace';
-import { MonacoBulkEditService } from './monaco-bulk-edit-service';
+import { ProtocolToMonacoConverter } from './protocol-to-monaco-converter';
 
 import IEditorOverrideServices = monaco.editor.IEditorOverrideServices;
-import { ApplicationServer } from '@theia/core/lib/common/application-protocol';
-import { OS, ContributionProvider } from '@theia/core';
-import { KeybindingRegistry, OpenerService, open, WidgetOpenerOptions } from '@theia/core/lib/browser';
-import { MonacoResolvedKeybinding } from './monaco-resolved-keybinding';
-import { HttpOpenHandlerOptions } from '@theia/core/lib/browser/http-open-handler';
-import { MonacoToProtocolConverter } from './monaco-to-protocol-converter';
-import { ProtocolToMonacoConverter } from './protocol-to-monaco-converter';
 
 export const MonacoEditorFactory = Symbol('MonacoEditorFactory');
 export interface MonacoEditorFactory {
@@ -291,6 +291,9 @@ export class MonacoEditorProvider {
 
     protected async formatOnSave(editor: MonacoEditor, event: WillSaveMonacoModelEvent): Promise<monaco.editor.IIdentifiedSingleEditOperation[]> {
         if (event.reason !== TextDocumentSaveReason.Manual) {
+            return [];
+        }
+        if (event.options?.skipFormattingOnSave) {
             return [];
         }
         const overrideIdentifier = editor.document.languageId;

@@ -14,12 +14,13 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { Widget } from '@phosphor/widgets';
 import { Message } from '@phosphor/messaging';
+import { Widget } from '@phosphor/widgets';
 import { Event } from '../common/event';
 import { MaybePromise } from '../common/types';
-import { Key } from './keyboard/keys';
+import { SaveOptions } from './common-frontend-contribution';
 import { AbstractDialog } from './dialogs';
+import { Key } from './keyboard/keys';
 import { waitForClosed } from './widgets';
 
 export interface Saveable {
@@ -29,7 +30,7 @@ export interface Saveable {
     /**
      * Saves dirty changes.
      */
-    save(): MaybePromise<void>;
+    save(options?: SaveOptions): MaybePromise<void>;
     /**
      * Reverts dirty changes.
      */
@@ -87,10 +88,10 @@ export namespace Saveable {
         return !!getDirty(arg);
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    export async function save(arg: any): Promise<void> {
+    export async function save(arg: any, options?: SaveOptions): Promise<void> {
         const saveable = get(arg);
         if (saveable) {
-            await saveable.save();
+            await saveable.save(options);
         }
     }
     export function apply(widget: Widget): SaveableWidget | undefined {
