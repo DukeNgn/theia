@@ -150,6 +150,46 @@ export const enum EncodingMode {
     Decode
 }
 
+/**
+ * Options for searching in an editor.
+ */
+export interface FindMatchesOptions {
+    /**
+     * The string used to search. If it is a regular expression, set `isRegex` to true.
+     */
+    searchString: string;
+    /**
+     * Used to indicate the `searchString` is a regular expression.
+     */
+    isRegex: boolean;
+    /**
+     * Force the matching to match lower/upper case exactly.
+     */
+    matchCase: boolean;
+    /**
+     * Force the matching to match entire words only.
+     */
+    matchWholeWord: boolean;
+    /**
+     * Limit the number of results.
+     */
+    limitResultCount?: number;
+}
+
+/**
+ * The representation of a search result for a given editor.
+ */
+export interface FindMatch {
+    /**
+     * The matched string.
+     */
+    readonly matches: string[];
+    /**
+     * The ranges where the matches are. It is empty if no matches have been found.
+     */
+    readonly range: Range;
+}
+
 export interface TextEditor extends Disposable, TextEditorSelection, Navigatable {
     readonly node: HTMLElement;
 
@@ -237,6 +277,18 @@ export interface TextEditor extends Disposable, TextEditorSelection, Navigatable
     setEncoding(encoding: string, mode: EncodingMode): void;
 
     readonly onEncodingChanged: Event<string>;
+
+    /**
+     * Find matches in an editor for the given options.
+     * @param options the options for finding matches.
+     * @returns the list of matches.
+     */
+    findMatches?(options: FindMatchesOptions): FindMatch[];
+
+    /**
+     * Get the text for a certain line.
+     */
+    getLineContent?(lineNumber: number): string;
 }
 
 export interface Dimension {
