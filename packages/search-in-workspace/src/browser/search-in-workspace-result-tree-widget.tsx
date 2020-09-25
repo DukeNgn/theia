@@ -42,6 +42,8 @@ import * as React from 'react';
 import { SearchInWorkspacePreferences } from './search-in-workspace-preferences';
 import { ProgressService } from '@theia/core';
 import { ColorRegistry } from '@theia/core/lib/browser/color-registry';
+import { MonacoEditor } from '@theia/monaco/lib/browser/monaco-editor';
+import * as minimatch from 'minimatch';
 
 const ROOT_ID = 'ResultTree';
 
@@ -102,6 +104,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     protected _showReplaceButtons = false;
     protected _replaceTerm = '';
     protected searchTerm = '';
+    protected dirtyFileUris = new Set<string>();
 
     protected appliedDecorations = new Map<string, string[]>();
 
@@ -117,10 +120,10 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     @inject(ApplicationShell) protected readonly shell: ApplicationShell;
     @inject(WorkspaceService) protected readonly workspaceService: WorkspaceService;
     @inject(TreeExpansionService) protected readonly expansionService: TreeExpansionService;
+    @inject(FileSystemPreferences) protected readonly fileSystemPreferences: FileSystemPreferences;
     @inject(SearchInWorkspacePreferences) protected readonly searchInWorkspacePreferences: SearchInWorkspacePreferences;
     @inject(ProgressService) protected readonly progressService: ProgressService;
     @inject(ColorRegistry) protected readonly colorRegistry: ColorRegistry;
-    @inject(FileSystemPreferences) protected readonly filesystemPreferences: FileSystemPreferences;
 
     constructor(
         @inject(TreeProps) readonly props: TreeProps,
@@ -199,13 +202,129 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         });
     }
 
+    /**
+     * Find matches in a single widget.
+     * @param searchTerm  The search keyword.
+     * @param widget The widget that is being searched.
+     * @param searchOptions The options for search operation.
+     */
+    findMatches(searchTerm: string, widget: EditorWidget, searchOptions: SearchInWorkspaceOptions): SearchMatch[] {
+        let matches: SearchMatch[] = [];
+        if (widget.editor instanceof MonacoEditor) {
+            const model = widget.editor.getControl().getModel();
+            if (model) {
+                const results: monaco.editor.FindMatch[] | undefined = model.findMatches(
+                    searchTerm,
+                    true,
+                    !!searchOptions.useRegExp,
+                    !!searchOptions.matchCase,
+                    // eslint-disable-next-line no-null/no-null
+                    searchOptions.matchWholeWord ? searchTerm : null,
+                    true,
+                    searchOptions.maxResults);
+                if (results) {
+                    const extractedResults: SearchMatch[] = results.map(r => ({
+                        line: r.range.startLineNumber,
+                        character: r.range.startColumn,
+                        length: r.range.endColumn - r.range.startColumn,
+                        lineText: model.getLineContent(r.range.startLineNumber),
+                    }));
+                    if (searchOptions.maxResults) {
+                        searchOptions.maxResults -= results.length;
+                    }
+                    matches = matches.concat(extractedResults);
+                }
+            }
+        }
+        return matches;
+    }
+
+    filterEditorWidgets(widgets: EditorWidget[], searchOptions: SearchInWorkspaceOptions): EditorWidget[] {
+        if (!widgets.length) {
+            return [];
+        }
+        // Exclude dirty widgets that should be ignored in glob.
+        if (!searchOptions.includeIgnored) {
+            const ignoredPatterns = this.fileSystemPreferences.get('files.exclude');
+            widgets = widgets.filter(widget => {
+                for (const pattern in ignoredPatterns) {
+                    if (ignoredPatterns[pattern] && minimatch(widget.editor.uri.toString(), pattern)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+        }
+        // Only include dirty widgets that in `files to include`.
+        if (searchOptions.include && searchOptions.include.length > 0) {
+            const includePatterns: string[] = searchOptions.include;
+            widgets = widgets.filter(widget => includePatterns.some(pattern => minimatch(widget.editor.uri.toString(), pattern)));
+        }
+        // Exclude dirty widgets that are in `files to exclude`
+        if (searchOptions.exclude && searchOptions.exclude.length > 0) {
+            const excludePatterns: string[] = searchOptions.exclude;
+            widgets = widgets.filter(widget => !excludePatterns.some(pattern => minimatch(widget.editor.uri.toString(), pattern)));
+        }
+        return widgets;
+    }
+
+    /**
+     * Perform searching in all dirty editors.
+     * @param searchTerm The search keyword.
+     * @param searchOptions The options for search operation.
+     * @returns The number of matches in dirty editors.
+     */
+    searchInDirtyEditors(searchTerm: string, searchOptions: SearchInWorkspaceOptions): void {
+        let dirtyWidgets: EditorWidget[] = this.editorManager.all.filter(widget => widget.saveable.dirty);
+        dirtyWidgets = this.filterEditorWidgets(dirtyWidgets, searchOptions);
+        dirtyWidgets.forEach(async widget => {
+            const matches = this.findMatches(searchTerm, widget, searchOptions);
+            if (matches?.length) {
+                const fileUri: string = widget.editor.uri.toString();
+                const root: string = this.workspaceService.getWorkspaceRootUri(widget.editor.uri)?.toString()!;
+                this.appendToResultTree({ root, fileUri, matches }, true);
+            }
+        });
+    }
+
+    /**
+     * Append search results to the result tree
+     * @param result Search results
+     * @param isDirtyResult Whether the search results are from a dirty file
+     */
+    appendToResultTree(result: SearchInWorkspaceResult, isDirtyResult?: boolean): void {
+        const collapseValue: string = this.searchInWorkspacePreferences['search.collapseResults'];
+        const { path } = this.filenameAndPath(result.root, result.fileUri);
+        const tree = this.resultTree;
+        let rootFolderNode = tree.get(result.root);
+        if (!rootFolderNode) {
+            rootFolderNode = this.createRootFolderNode(result.root);
+            tree.set(result.root, rootFolderNode);
+        }
+        let fileNode = rootFolderNode.children.find(f => f.fileUri === result.fileUri);
+        if (!fileNode) {
+            fileNode = this.createFileNode(result.root, path, result.fileUri, rootFolderNode);
+            rootFolderNode.children.push(fileNode);
+        }
+        if (isDirtyResult) {
+            this.dirtyFileUris.add(fileNode.fileUri);
+        }
+        for (const match of result.matches) {
+            const line = this.createResultLineNode(result, match, fileNode);
+            if (fileNode.children.findIndex(lineNode => lineNode.id === line.id) < 0) {
+                fileNode.children.push(line);
+            }
+        }
+        this.collapseFileNode(fileNode, collapseValue);
+    }
+
     async search(searchTerm: string, searchOptions: SearchInWorkspaceOptions): Promise<void> {
         this.searchTerm = searchTerm;
-        const collapseValue: string = this.searchInWorkspacePreferences['search.collapseResults'];
         searchOptions = {
             ...searchOptions,
             exclude: this.getExcludeGlobs(searchOptions.exclude)
         };
+        this.dirtyFileUris.clear();
         this.resultTree.clear();
         if (this.cancelIndicator) {
             this.cancelIndicator.cancel();
@@ -226,6 +345,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
             this.cancelIndicator = undefined;
             this.changeEmitter.fire(this.resultTree);
         });
+        this.searchInDirtyEditors(searchTerm, searchOptions);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let pendingRefreshTimeout: any;
         const searchId = await this.searchService.search(searchTerm, {
@@ -233,25 +353,14 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
                 if (token.isCancellationRequested || aSearchId !== searchId) {
                     return;
                 }
-                const { path } = this.filenameAndPath(result.root, result.fileUri);
-                const tree = this.resultTree;
-                let rootFolderNode = tree.get(result.root);
-                if (!rootFolderNode) {
-                    rootFolderNode = this.createRootFolderNode(result.root);
-                    tree.set(result.root, rootFolderNode);
-                }
-                let fileNode = rootFolderNode.children.find(f => f.fileUri === result.fileUri);
-                if (!fileNode) {
-                    fileNode = this.createFileNode(result.root, path, result.fileUri, rootFolderNode);
-                    rootFolderNode.children.push(fileNode);
-                }
-                for (const match of result.matches) {
-                    const line = this.createResultLineNode(result, match, fileNode);
-                    if (fileNode.children.findIndex(lineNode => lineNode.id === line.id) < 0) {
-                        fileNode.children.push(line);
+                if (this.dirtyFileUris.has(result.fileUri)) {
+                    // Give back one result counter to maxResults since this is a duplicate
+                    if (searchOptions.maxResults) {
+                        searchOptions.maxResults++;
                     }
+                    return;
                 }
-                this.collapseFileNode(fileNode, collapseValue);
+                this.appendToResultTree(result);
                 if (pendingRefreshTimeout) {
                     clearTimeout(pendingRefreshTimeout);
                 }
@@ -785,7 +894,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
      * @returns the list of exclude globs.
      */
     protected getExcludeGlobs(excludeOptions?: string[]): string[] {
-        const excludePreferences = this.filesystemPreferences['files.exclude'];
+        const excludePreferences = this.fileSystemPreferences['files.exclude'];
         const excludePreferencesGlobs = Object.keys(excludePreferences).filter(key => !!excludePreferences[key]);
         return [...new Set([...excludePreferencesGlobs, ...excludeOptions])];
     }
