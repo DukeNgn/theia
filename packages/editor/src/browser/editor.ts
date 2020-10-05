@@ -150,6 +150,54 @@ export const enum EncodingMode {
     Decode
 }
 
+/**
+ * Options for searching matches in a model.
+ */
+export interface FindMatchesOptions {
+    /**
+     * The string used to search. If it is a regular expression, set `isRegex` to true.
+     */
+    searchString: string;
+    /**
+     * Limit the searching to only search inside the editable range of the model.
+     */
+    searchOnlyEditableRange: boolean;
+    /**
+     * Used to indicate the `searchString` is a regular expression.
+     */
+    isRegex: boolean;
+    /**
+     * Force the matching to match lower/upper case exactly.
+     */
+    matchCase: boolean;
+    /**
+     * Force the matching to match entire words only. Pass null otherwise.
+     */
+    wordSeparators: string | null;
+    /**
+     * The result will contain the captured groups.
+     */
+    captureMatches: boolean;
+    /**
+     * Limit the number of results.
+     */
+    limitResultCount?: number;
+}
+
+/**
+ * The result of searching matches in a model.
+ */
+export interface FindMatch {
+    /**
+     * The matched string. Null if nothing has been found.
+     */
+    readonly matches: string[] | null;
+    /**
+     * The ranges where the matches are. It is empty if no matches have been found.
+     */
+    readonly range: Range;
+}
+
 export interface TextEditor extends Disposable, TextEditorSelection, Navigatable {
     readonly node: HTMLElement;
 
@@ -237,6 +285,17 @@ export interface TextEditor extends Disposable, TextEditorSelection, Navigatable
     setEncoding(encoding: string, mode: EncodingMode): void;
 
     readonly onEncodingChanged: Event<string>;
+
+    /**
+     * Find matches in an editor model.
+     * @param options: options for finding matches.
+     */
+    findMatches?(options: FindMatchesOptions): FindMatch[];
+
+    /**
+     * Get the text for a certain line.
+     */
+    getLineContent?(lineNumber: number): string;
 }
 
 export interface Dimension {

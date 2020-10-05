@@ -31,7 +31,8 @@ import {
     DiffUris
 } from '@theia/core/lib/browser';
 import { CancellationTokenSource, Emitter, Event } from '@theia/core';
-import { EditorManager, EditorDecoration, TrackedRangeStickiness, OverviewRulerLane, EditorWidget, ReplaceOperation, EditorOpenerOptions } from '@theia/editor/lib/browser';
+// eslint-disable-next-line max-len
+import { EditorManager, EditorDecoration, TrackedRangeStickiness, OverviewRulerLane, EditorWidget, ReplaceOperation, EditorOpenerOptions, FindMatch } from '@theia/editor/lib/browser';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { FileResourceResolver, FileSystemPreferences } from '@theia/filesystem/lib/browser';
 import { SearchInWorkspaceResult, SearchInWorkspaceOptions, SearchMatch } from '../common/search-in-workspace-interface';
@@ -42,7 +43,6 @@ import * as React from 'react';
 import { SearchInWorkspacePreferences } from './search-in-workspace-preferences';
 import { ProgressService } from '@theia/core';
 import { ColorRegistry } from '@theia/core/lib/browser/color-registry';
-import { MonacoEditor } from '@theia/monaco/lib/browser/monaco-editor';
 import * as minimatch from 'minimatch';
 
 const ROOT_ID = 'ResultTree';
@@ -209,31 +209,35 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
      * @param searchOptions The options for search operation.
      */
     findMatches(searchTerm: string, widget: EditorWidget, searchOptions: SearchInWorkspaceOptions): SearchMatch[] {
-        let matches: SearchMatch[] = [];
-        if (widget.editor instanceof MonacoEditor) {
-            const model = widget.editor.getControl().getModel();
-            if (model) {
-                const results: monaco.editor.FindMatch[] | undefined = model.findMatches(
-                    searchTerm,
-                    true,
-                    !!searchOptions.useRegExp,
-                    !!searchOptions.matchCase,
-                    // eslint-disable-next-line no-null/no-null
-                    searchOptions.matchWholeWord ? searchTerm : null,
-                    true,
-                    searchOptions.maxResults);
-                if (results) {
-                    const extractedResults: SearchMatch[] = results.map(r => ({
-                        line: r.range.startLineNumber,
-                        character: r.range.startColumn,
-                        length: r.range.endColumn - r.range.startColumn,
-                        lineText: model.getLineContent(r.range.startLineNumber),
-                    }));
-                    if (searchOptions.maxResults) {
-                        searchOptions.maxResults -= results.length;
-                    }
-                    matches = matches.concat(extractedResults);
+        const matches: SearchMatch[] = [];
+        if (!widget.editor.findMatches || !widget.editor.getLineContent) {
+            return [];
+        }
+        const results: FindMatch[] = widget.editor.findMatches({
+            searchString: searchTerm,
+            searchOnlyEditableRange: true,
+            isRegex: !!searchOptions.useRegExp,
+            matchCase: !!searchOptions.matchCase,
+            // eslint-disable-next-line no-null/no-null
+            wordSeparators: searchOptions.matchWholeWord ? searchTerm : null,
+            captureMatches: true,
+            limitResultCount: searchOptions.maxResults
+        });
+        if (results.length > 0) {
+            results.forEach(r => {
+                if (!widget.editor.getLineContent) {
+                    return [];
                 }
+                const lineText: string = widget.editor.getLineContent(r.range.start.line);
+                matches.push({
+                    line: r.range.start.line,
+                    character: r.range.start.character,
+                    length: r.range.end.character - r.range.start.character,
+                    lineText
+                });
+            });
+            if (searchOptions.maxResults) {
+                searchOptions.maxResults -= results.length;
             }
         }
         return matches;

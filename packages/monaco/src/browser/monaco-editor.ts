@@ -34,7 +34,7 @@ import {
     ReplaceTextParams,
     EditorDecoration,
     EditorMouseEvent,
-    EncodingMode
+    EncodingMode, FindMatchesOptions, FindMatch
 } from '@theia/editor/lib/browser';
 import { MonacoEditorModel } from './monaco-editor-model';
 import { MonacoToProtocolConverter } from './monaco-to-protocol-converter';
@@ -119,6 +119,35 @@ export class MonacoEditor extends MonacoEditorServices implements TextEditor {
 
     setEncoding(encoding: string, mode: EncodingMode): Promise<void> {
         return this.document.setEncoding(encoding, mode);
+    }
+
+    findMatches(options: FindMatchesOptions): FindMatch[] {
+        const model = this.editor.getModel();
+        if (!model) {
+            return [];
+        }
+        const results: monaco.editor.FindMatch[] = model.findMatches(
+            options.searchString,
+            options.searchOnlyEditableRange,
+            options.isRegex,
+            options.matchCase,
+            options.wordSeparators,
+            options.captureMatches,
+            options.limitResultCount
+        );
+        const extractedMatches: FindMatch[] = results.map(r => ({
+            matches: r.matches,
+            range: Range.create(r.range.startLineNumber, r.range.startColumn, r.range.endLineNumber, r.range.endColumn)
+        }));
+        return extractedMatches;
+    }
+
+    getLineContent(lineNumber: number): string {
+        const model = this.editor.getModel();
+        if (!model) {
+            return '';
+        }
+        return model.getLineContent(lineNumber);
     }
 
     protected create(options?: IStandaloneEditorConstructionOptions, override?: monaco.editor.IEditorOverrideServices): Disposable {
