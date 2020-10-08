@@ -107,6 +107,8 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     protected _replaceTerm = '';
     protected searchTerm = '';
     protected dirtyFileUris = new Set<string>();
+    protected outsideWorkspaceRootUri = 'Other files';
+    protected hasOutsideWorkspaceResults = false;
 
     protected appliedDecorations = new Map<string, string[]>();
 
@@ -246,7 +248,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         if (!widgets.length) {
             return [];
         }
-        // Exclude dirty widgets that should be ignored in glob.
+        // Exclude widgets that should be ignored in glob.
         if (!searchOptions.includeIgnored) {
             const ignoredPatterns = this.fileSystemPreferences.get('files.exclude');
             widgets = widgets.filter(widget => {
@@ -258,12 +260,12 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
                 return true;
             });
         }
-        // Only include dirty widgets that in `files to include`.
+        // Only include widgets that in `files to include`.
         if (searchOptions.include && searchOptions.include.length > 0) {
             const includePatterns: string[] = searchOptions.include;
             widgets = widgets.filter(widget => includePatterns.some(pattern => minimatch(widget.editor.uri.toString(), pattern)));
         }
-        // Exclude dirty widgets that are in `files to exclude`
+        // Exclude widgets that are in `files to exclude`
         if (searchOptions.exclude && searchOptions.exclude.length > 0) {
             const excludePatterns: string[] = searchOptions.exclude;
             widgets = widgets.filter(widget => !excludePatterns.some(pattern => minimatch(widget.editor.uri.toString(), pattern)));
@@ -272,32 +274,40 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     }
 
     /**
-     * Perform searching in all dirty editors.
+     * Perform searching in all opening editors.
      * @param searchTerm The search keyword.
      * @param searchOptions The options for search operation.
-     * @returns The number of matches in dirty editors.
+     * @returns The number of matches in open editors.
      */
-    protected searchInDirtyEditors(searchTerm: string, searchOptions: SearchInWorkspaceOptions): void {
-        let dirtyWidgets: EditorWidget[] = this.editorManager.all.filter(widget => widget.saveable.dirty);
-        dirtyWidgets = this.filterEditorWidgets(dirtyWidgets, searchOptions);
-        dirtyWidgets.forEach(async widget => {
-            const matches = this.findMatches(searchTerm, widget, searchOptions);
-            if (matches?.length) {
-                const fileUri: string = widget.editor.uri.toString();
-                const root: string = this.workspaceService.getWorkspaceRootUri(widget.editor.uri)?.toString()!;
-                this.appendToResultTree({ root, fileUri, matches }, true);
+    protected searchOpenEditors(searchTerm: string, searchOptions: SearchInWorkspaceOptions): void {
+        const widgets: EditorWidget[] = this.filterEditorWidgets(this.editorManager.all, searchOptions);
+        const searchResults: SearchInWorkspaceResult[] = [];
+        widgets.forEach(async w => {
+            const root: string | undefined = this.workspaceService.getWorkspaceRootUri(w.editor.uri)?.toString();
+            const matches = this.findMatches(searchTerm, w, searchOptions);
+            if (matches.length) {
+                searchResults.push({
+                    root: root ? root : this.outsideWorkspaceRootUri,
+                    fileUri: w.editor.uri.toString(),
+                    matches
+                });
             }
+        });
+        this.hasOutsideWorkspaceResults = searchResults.some(r => r.root === this.outsideWorkspaceRootUri);
+        searchResults.forEach(r => {
+            const isOutsideWorkspaceResult = (r.root === this.outsideWorkspaceRootUri);
+            this.appendToResultTree(r, !isOutsideWorkspaceResult, isOutsideWorkspaceResult);
         });
     }
 
     /**
-     * Append search results to the result tree
-     * @param result Search results
-     * @param isDirtyResult Whether the search results are from a dirty file
+     * Append search results to the result tree.
+     * @param result Search results.
+     * @param isDirtyResult Whether the search results are from a dirty file.
      */
-    protected appendToResultTree(result: SearchInWorkspaceResult, isDirtyResult?: boolean): void {
+    protected appendToResultTree(result: SearchInWorkspaceResult, isDirtyResult?: boolean, isOutsideWorkspaceResult?: boolean): void {
         const collapseValue: string = this.searchInWorkspacePreferences['search.collapseResults'];
-        const { path } = this.filenameAndPath(result.root, result.fileUri);
+        const { path } = this.filenameAndPath(result.root, result.fileUri, isOutsideWorkspaceResult);
         const tree = this.resultTree;
         let rootFolderNode = tree.get(result.root);
         if (!rootFolderNode) {
@@ -329,6 +339,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         };
         this.dirtyFileUris.clear();
         this.resultTree.clear();
+        this.hasOutsideWorkspaceResults = false;
         if (this.cancelIndicator) {
             this.cancelIndicator.cancel();
         }
@@ -348,7 +359,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
             this.cancelIndicator = undefined;
             this.changeEmitter.fire(this.resultTree);
         });
-        this.searchInDirtyEditors(searchTerm, searchOptions);
+        this.searchOpenEditors(searchTerm, searchOptions);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let pendingRefreshTimeout: any;
         const searchId = await this.searchService.search(searchTerm, {
@@ -459,7 +470,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
             expanded: true,
             id: rootUri,
             parent: this.model.root as SearchInWorkspaceRoot,
-            visible: this.workspaceService.isMultiRootWorkspaceOpened
+            visible: this.hasOutsideWorkspaceResults || this.workspaceService.isMultiRootWorkspaceOpened
         };
     }
 
@@ -502,11 +513,24 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         return nodes;
     }
 
-    protected filenameAndPath(rootUriStr: string, uriStr: string): { name: string, path: string } {
+    /**
+     * Return file name and relative path by default.
+     * @param rootUriStr The string of root uri.
+     * @param uriStr The string of uri to the file.
+     * @param getAbsolutePath option to get absolute path instead of relative path.
+     */
+    protected filenameAndPath(rootUriStr: string, uriStr: string, getAbsolutePath?: boolean): { name: string, path: string } {
         const uri: URI = new URI(uriStr);
+        const name = this.labelProvider.getName(uri);
+        if (getAbsolutePath) {
+            return {
+                name,
+                path: this.labelProvider.getLongName(uri)
+            };
+        }
         const relativePath = new URI(rootUriStr).relative(uri.parent);
         return {
-            name: uri.displayName,
+            name,
             path: relativePath ? relativePath.toString() : ''
         };
     }
@@ -708,9 +732,11 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
                         <span className={'file-name'}>
                             {this.toNodeName(node)}
                         </span>
-                        <span className={'file-path'}>
-                            {node.path}
-                        </span>
+                        {node.path !== '/Other files' &&
+                            <span className={'file-path'}>
+                                {node.path}
+                            </span>
+                        }
                     </div>
                 </div>
                 <span className='notification-count-container highlighted-count-container'>
