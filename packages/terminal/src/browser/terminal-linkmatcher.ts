@@ -129,3 +129,19 @@ export class LocalhostMatcher extends AbstractCmdClickTerminalContribution {
         };
     }
 }
+
+@injectable()
+export class URIMatcher extends AbstractCmdClickTerminalContribution {
+
+    @inject(OpenerService)
+    protected readonly openerService: OpenerService;
+
+    async getRegExp(): Promise<RegExp> {
+        return /(https?:\/\/)?(localhost|127\.0\.0\.1|0\.0\.0\.0)(:[0-9]{1,5})?([-a-zA-Z0-9@:%_\+.~#?&//=]*)/;
+    }
+
+    getHandler(): (event: MouseEvent, uri: string) => void {
+        return (event: MouseEvent, uri: string) =>
+            open(this.openerService, new URI(uri));
+    }
+}
