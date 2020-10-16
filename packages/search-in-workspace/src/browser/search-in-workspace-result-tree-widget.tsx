@@ -242,13 +242,6 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     }
 
     /**
-     * Apply search options to filter editor widgets.
-     * @param editors The widgets to be filtered.
-     * @param searchOptions User-defined search options.
-     * @return The filtered array of editor widgets.
-     */
-
-    /**
      * Find the list of editors which meet the filtering criteria.
      * @param editors the list of editors to filter.
      * @param searchOptions the search options to apply.
@@ -259,19 +252,12 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         }
 
         const ignoredPatterns = this.getExcludeGlobs(searchOptions.exclude);
-        editors.filter(widget => {
-            for (const pattern in ignoredPatterns) {
-                if (ignoredPatterns[pattern] && minimatch(widget.editor.uri.toString(), pattern)) {
-                    return false;
-                }
-            }
-            return true;
-        });
+        editors = editors.filter(widget => !ignoredPatterns.some(pattern => minimatch(widget.editor.uri.toString(), pattern, { dot: true, matchBase: true })));
 
         // Only include widgets that in `files to include`.
         if (searchOptions.include && searchOptions.include.length > 0) {
             const includePatterns: string[] = searchOptions.include;
-            editors = editors.filter(widget => includePatterns.some(pattern => minimatch(widget.editor.uri.toString(), pattern)));
+            editors = editors.filter(widget => includePatterns.some(pattern => minimatch(widget.editor.uri.toString(), pattern, { dot: true, matchBase: true })));
         }
 
         return editors;
@@ -282,23 +268,21 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
      * @param searchTerm the search term.
      * @param searchOptions the search options to apply.
      *
-     * @returns the tuple of remaining result count, and the list of search results.
+     * @returns the tuple of result count, and the list of search results.
      */
     protected searchInOpenEditors(searchTerm: string, searchOptions: SearchInWorkspaceOptions): {
-        remainingMaxResults: number | undefined,
+        numberOfResults: number,
         matches: SearchInWorkspaceResult[]
     } {
-        // Track the remaining max results.
-        let maxResults = searchOptions.maxResults;
+        // Track the number of results found.
+        let numberOfResults = 0;
 
         const searchResults: SearchInWorkspaceResult[] = [];
         const editors = this.findMatchedEditors(this.editorManager.all, searchOptions);
         editors.forEach(async widget => {
-            const matches = this.findMatches(searchTerm, widget, { ...searchOptions, maxResults });
+            const matches = this.findMatches(searchTerm, widget, searchOptions);
             if (matches?.length) {
-                if (maxResults) {
-                    maxResults -= matches.length;
-                }
+                numberOfResults += matches.length;
                 const fileUri: string = widget.editor.uri.toString();
                 const root: string = this.workspaceService.getWorkspaceRootUri(widget.editor.uri)?.toString()!;
                 searchResults.push({ root, fileUri, matches });
@@ -306,7 +290,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         });
 
         return {
-            remainingMaxResults: maxResults,
+            numberOfResults,
             matches: searchResults
         };
     }
@@ -366,10 +350,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         });
 
         // Collect search results for opened editors which otherwise may not be found by ripgrep (ex: dirty editors).
-        const { remainingMaxResults: remainedMaxResults, matches: monacoMatches } = this.searchInOpenEditors(searchTerm, searchOptions);
-        // Reduce `maxResults` due to editor results.
-        searchOptions.maxResults = remainedMaxResults;
-
+        const { numberOfResults: monacoNumberOfResults, matches: monacoMatches } = this.searchInOpenEditors(searchTerm, searchOptions);
         monacoMatches.forEach(m => {
             this.appendToResultTree(m);
             // Exclude pattern beginning with './' works after the fix of #8469.
@@ -378,6 +359,11 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
             // Exclude files already covered by searching individual editors.
             searchOptions.exclude = (searchOptions.exclude) ? searchOptions.exclude.concat(excludePath) : [excludePath];
         });
+
+        // Reduce `maxResults` due to editor results.
+        if (searchOptions.maxResults) {
+            searchOptions.maxResults -= monacoNumberOfResults;
+        }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let pendingRefreshTimeout: any;
