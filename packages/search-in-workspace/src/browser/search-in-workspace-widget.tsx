@@ -334,9 +334,9 @@ export class SearchInWorkspaceWidget extends BaseWidget implements StatefulWidge
     }
 
     protected renderNotification(): React.ReactNode {
-        if (this.workspaceService.tryGetRoots().length <= 0) {
+        if (this.workspaceService.tryGetRoots().length <= 0 && !this.resultTreeWidget.hasOpenEditors()) {
             return <div className='search-notification show'>
-                <div>Cannot search without an active workspace present.</div>
+                <div>You have not opened or specified a folder. Only open files are currently searched.</div>
             </div>;
         }
         return <div

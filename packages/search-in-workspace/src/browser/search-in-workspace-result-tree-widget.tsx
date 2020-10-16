@@ -106,6 +106,8 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     protected _showReplaceButtons = false;
     protected _replaceTerm = '';
     protected searchTerm = '';
+    protected outsideWorkspaceRootUri = 'Other files';
+    protected hasOutsideWorkspaceResult = false;
 
     protected appliedDecorations = new Map<string, string[]>();
 
@@ -264,6 +266,13 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     }
 
     /**
+     * @returns whether there are open editors.
+     */
+    hasOpenEditors(): boolean {
+        return (this.editorManager.all.length > 0);
+    }
+
+    /**
      * Perform a search in all open editors.
      * @param searchTerm the search term.
      * @param searchOptions the search options to apply.
@@ -284,8 +293,12 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
             if (matches?.length) {
                 numberOfResults += matches.length;
                 const fileUri: string = widget.editor.uri.toString();
-                const root: string = this.workspaceService.getWorkspaceRootUri(widget.editor.uri)?.toString()!;
-                searchResults.push({ root, fileUri, matches });
+                const root: string | undefined = this.workspaceService.getWorkspaceRootUri(widget.editor.uri)?.toString();
+                searchResults.push({
+                    root: root ? root : this.outsideWorkspaceRootUri,
+                    fileUri,
+                    matches
+                });
             }
         });
 
@@ -301,7 +314,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
      */
     protected appendToResultTree(result: SearchInWorkspaceResult): void {
         const collapseValue: string = this.searchInWorkspacePreferences['search.collapseResults'];
-        const { path } = this.filenameAndPath(result.root, result.fileUri);
+        const { path } = this.filenameAndPath(result.root, result.fileUri, result.root === this.outsideWorkspaceRootUri);
         const tree = this.resultTree;
         let rootFolderNode = tree.get(result.root);
         if (!rootFolderNode) {
@@ -329,6 +342,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
             exclude: this.getExcludeGlobs(searchOptions.exclude)
         };
         this.resultTree.clear();
+        this.hasOutsideWorkspaceResult = false;
         if (this.cancelIndicator) {
             this.cancelIndicator.cancel();
         }
@@ -351,6 +365,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
 
         // Collect search results for opened editors which otherwise may not be found by ripgrep (ex: dirty editors).
         const { numberOfResults: monacoNumberOfResults, matches: monacoMatches } = this.searchInOpenEditors(searchTerm, searchOptions);
+        this.hasOutsideWorkspaceResult = monacoMatches.some(m => m.root === this.outsideWorkspaceRootUri);
         monacoMatches.forEach(m => {
             this.appendToResultTree(m);
             // Exclude pattern beginning with './' works after the fix of #8469.
@@ -468,7 +483,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
             expanded: true,
             id: rootUri,
             parent: this.model.root as SearchInWorkspaceRoot,
-            visible: this.workspaceService.isMultiRootWorkspaceOpened
+            visible: this.hasOutsideWorkspaceResult || this.workspaceService.isMultiRootWorkspaceOpened
         };
     }
 
@@ -511,11 +526,26 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         return nodes;
     }
 
-    protected filenameAndPath(rootUriStr: string, uriStr: string): { name: string, path: string } {
+    /**
+     * Get file name and construct a path of a file relatively to its root.
+     * @param rootUriStr the string of root uri.
+     * @param uriStr the string of the file uri.
+     * @param getAbsolutePath option to get absolute path instead of relative path.
+     *
+     * @returns a tuple of the file name and the path constructed by the root uri and the file uri.
+     */
+    protected filenameAndPath(rootUriStr: string, uriStr: string, getAbsolutePath?: boolean): { name: string, path: string } {
         const uri: URI = new URI(uriStr);
+        const name = this.labelProvider.getName(uri);
+        if (getAbsolutePath) {
+            return {
+                name,
+                path: this.labelProvider.getLongName(uri)
+            };
+        }
         const relativePath = new URI(rootUriStr).relative(uri.parent);
         return {
-            name: uri.displayName,
+            name,
             path: relativePath ? relativePath.toString() : ''
         };
     }
@@ -717,9 +747,11 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
                         <span className={'file-name'}>
                             {this.toNodeName(node)}
                         </span>
-                        <span className={'file-path'}>
-                            {node.path}
-                        </span>
+                        {node.path !== '/' + this.outsideWorkspaceRootUri &&
+                            <span className={'file-path'}>
+                                {node.path}
+                            </span>
+                        }
                     </div>
                 </div>
                 <span className='notification-count-container highlighted-count-container'>
