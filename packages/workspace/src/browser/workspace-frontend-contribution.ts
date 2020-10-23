@@ -418,8 +418,11 @@ export class WorkspaceFrontendContribution implements CommandContribution, Keybi
         } while (selected && exist && !overwrite);
         if (selected) {
             try {
-                await this.commandRegistry.executeCommand(CommonCommands.SAVE.id);
+                if (uri === selected) {
+                    await this.commandRegistry.executeCommand(CommonCommands.SAVE.id);
+                }
                 await this.fileService.copy(uri, selected, { overwrite });
+                await open(this.openerService, selected);
             } catch (e) {
                 console.warn(e);
             }
