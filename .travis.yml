@@ -68,15 +68,15 @@ branches:
     - master
 env:
   global:
-    - CXX=g++-4.8
-    - NODE_OPTIONS="--max_old_space_size=4096"
+    - CXX=g++-7
+    - NODE_OPTIONS="--max-old-space-size=4096"
 addons:
   apt:
     update: true
     sources:
       - ubuntu-toolchain-r-test
     packages:
-      - g++-4.8
+      - g++-7
       - libsecret-1-dev
       - xvfb
       - libx11-dev
