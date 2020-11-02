@@ -30,6 +30,11 @@ export const searchInWorkspacePreferencesSchema: PreferenceSchema = {
             default: 'auto',
             type: 'string',
             enum: ['auto', 'alwaysCollapse', 'alwaysExpand'],
+        },
+        'search.searchOnType': {
+            description: 'Search all files as you type.',
+            default: true,
+            type: 'boolean',
         }
     }
 };
@@ -37,6 +42,7 @@ export const searchInWorkspacePreferencesSchema: PreferenceSchema = {
 export class SearchInWorkspaceConfiguration {
     'search.lineNumbers': boolean;
     'search.collapseResults': string;
+    'search.searchOnType': boolean;
 }
 
 export const SearchInWorkspacePreferences = Symbol('SearchInWorkspacePreferences');

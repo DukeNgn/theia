@@ -46,6 +46,8 @@ import { SearchInWorkspacePreferences } from './search-in-workspace-preferences'
 import { ProgressService } from '@theia/core';
 import { ColorRegistry } from '@theia/core/lib/browser/color-registry';
 import * as minimatch from 'minimatch';
+import { DisposableCollection } from '@theia/core/lib/common/disposable';
+import debounce = require('lodash.debounce');
 
 const ROOT_ID = 'ResultTree';
 
@@ -106,6 +108,10 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     protected _showReplaceButtons = false;
     protected _replaceTerm = '';
     protected searchTerm = '';
+    protected searchOptions: SearchInWorkspaceOptions;
+
+    protected readonly searchOnTypeDelay = 300;
+    protected readonly toDisposeOnActiveEditorChanged = new DisposableCollection();
 
     // The default root name to add external search results in the case that a workspace is opened.
     protected readonly defaultRootName = 'Other files';
@@ -163,8 +169,20 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         this.toDispose.push(this.changeEmitter);
         this.toDispose.push(this.focusInputEmitter);
 
-        this.toDispose.push(this.editorManager.onActiveEditorChanged(() => {
+        this.toDispose.push(this.editorManager.onActiveEditorChanged(activeEditor => {
             this.updateCurrentEditorDecorations();
+            this.toDisposeOnActiveEditorChanged.dispose();
+            this.toDispose.push(this.toDisposeOnActiveEditorChanged);
+            if (activeEditor) {
+                this.toDisposeOnActiveEditorChanged.push(activeEditor.editor.onDocumentContentChanged(() => {
+                    if (this.searchTerm !== '' && this.searchInWorkspacePreferences['search.searchOnType']) {
+                        debounce(
+                            () => this.searchActiveEditor(activeEditor, this.searchTerm, this.searchOptions),
+                            this.searchOnTypeDelay
+                        )();
+                    }
+                }));
+            }
         }));
 
         this.toDispose.push(this.searchInWorkspacePreferences.onPreferenceChanged(() => {
@@ -262,31 +280,62 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     }
 
     /**
-     * Find the list of editors which meet the filtering criteria.
-     * @param editors the list of editors to filter.
-     * @param searchOptions the search options to apply.
+     * Determine if the URI matches any of the patterns.
+     * @param uri the editor URI.
+     * @param patterns
      */
-    protected findMatchedEditors(editors: EditorWidget[], searchOptions: SearchInWorkspaceOptions): EditorWidget[] {
-        if (!editors.length) {
-            return [];
-        }
+    protected inPatternList(uri: URI, patterns: string[]): boolean {
+        const opts: minimatch.IOptions = { dot: true, matchBase: true };
+        return patterns.some(pattern => minimatch(uri.toString(), this.convertPatternToGlob(uri, pattern), opts));
+    }
 
+    /**
+     * Check whether the given editor meets the filtering criteria.
+     */
+    protected isEditorValid(editorWidget: EditorWidget, searchOptions: SearchInWorkspaceOptions): boolean {
         const ignoredPatterns = this.getExcludeGlobs(searchOptions.exclude);
-        editors = editors.filter(widget => !ignoredPatterns.some(pattern => minimatch(
-            widget.editor.uri.toString(),
-            this.convertPatternToGlob(this.workspaceService.getWorkspaceRootUri(widget.editor.uri), pattern),
-            { dot: true, matchBase: true })));
-
-        // Only include widgets that in `files to include`.
-        if (searchOptions.include && searchOptions.include.length > 0) {
-            const includePatterns: string[] = searchOptions.include;
-            editors = editors.filter(widget => includePatterns.some(pattern => minimatch(
-                widget.editor.uri.toString(),
-                this.convertPatternToGlob(this.workspaceService.getWorkspaceRootUri(widget.editor.uri), pattern),
-                { dot: true, matchBase: true })));
+        if (this.inPatternList(editorWidget.editor.uri, ignoredPatterns)) {
+            return false;
         }
 
-        return editors;
+        const includePatterns = searchOptions.include;
+        if (!!includePatterns?.length && !this.inPatternList(editorWidget.editor.uri, includePatterns)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Search the active editor only and update the tree with those results.
+     */
+    protected searchActiveEditor(activeEditor: EditorWidget, searchTerm: string, searchOptions: SearchInWorkspaceOptions): void {
+        const includesExternalResults = () => !!this.resultTree.get(this.defaultRootName);
+
+        // Check if outside workspace results are present before searching.
+        const hasExternalResultsBefore = includesExternalResults();
+
+        // Collect search results for the given editor.
+        const results = this.searchInEditor(activeEditor, searchTerm, searchOptions);
+
+        // Update the tree by removing the result node, and add new results if applicable.
+        this.getFileNodesByUri(activeEditor.editor.uri).forEach(fileNode => this.removeFileNode(fileNode));
+        if (results) {
+            this.appendToResultTree(results);
+        }
+
+        // Check if outside workspace results are present after searching.
+        const hasExternalResultsAfter = includesExternalResults();
+
+        // Redo a search to update the tree node visibility if:
+        // + `Other files` node was present, now it is not.
+        // + `Other files` node was not present, now it is.
+        if (hasExternalResultsBefore ? !hasExternalResultsAfter : hasExternalResultsAfter) {
+            this.search(this.searchTerm, this.searchOptions);
+            return;
+        }
+
+        this.handleSearchCompleted();
     }
 
     /**
@@ -304,24 +353,45 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         let numberOfResults = 0;
 
         const searchResults: SearchInWorkspaceResult[] = [];
-        const editors = this.findMatchedEditors(this.editorManager.all, searchOptions);
-        editors.forEach(async widget => {
-            const matches = this.findMatches(searchTerm, widget, searchOptions);
-            if (matches.length > 0) {
-                numberOfResults += matches.length;
-                const fileUri: string = widget.editor.uri.toString();
-                const root: string | undefined = this.workspaceService.getWorkspaceRootUri(widget.editor.uri)?.toString();
-                searchResults.push({
-                    root: root ?? this.defaultRootName,
-                    fileUri,
-                    matches
-                });
+
+        this.editorManager.all.forEach(e => {
+            const editorResults = this.searchInEditor(e, searchTerm, searchOptions);
+            if (editorResults) {
+                numberOfResults += editorResults.matches.length;
+                searchResults.push(editorResults);
             }
         });
 
         return {
             numberOfResults,
             matches: searchResults
+        };
+    }
+
+    /**
+     * Perform a search in the target editor.
+     * @param editorWidget the editor widget.
+     * @param searchTerm the search term.
+     * @param searchOptions the search options to apply.
+     *
+     * @returns the search results from the given editor, undefined if the editor is either filtered or has no matches found.
+     */
+    protected searchInEditor(editorWidget: EditorWidget, searchTerm: string, searchOptions: SearchInWorkspaceOptions): SearchInWorkspaceResult | undefined {
+        if (!this.isEditorValid(editorWidget, searchOptions)) {
+            return;
+        }
+
+        const matches: SearchMatch[] = this.findMatches(searchTerm, editorWidget, searchOptions);
+        if (matches.length <= 0) {
+            return;
+        }
+
+        const fileUri = editorWidget.editor.uri.toString();
+        const root: string | undefined = this.workspaceService.getWorkspaceRootUri(editorWidget.editor.uri)?.toString();
+        return {
+            root: root ?? this.defaultRootName,
+            fileUri,
+            matches
         };
     }
 
@@ -360,8 +430,10 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
     /**
      * Handle when searching completed.
      */
-    protected handleSearchCompleted(cancelIndicator: CancellationTokenSource): void {
-        cancelIndicator.cancel();
+    protected handleSearchCompleted(cancelIndicator?: CancellationTokenSource): void {
+        if (cancelIndicator) {
+            cancelIndicator.cancel();
+        }
         this.sortResultTree();
         this.refreshModelChildren();
     }
@@ -380,8 +452,14 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         });
     }
 
+    /**
+     * Search and populate the result tree with matches.
+     * @param searchTerm the search term.
+     * @param searchOptions the search options to apply.
+     */
     async search(searchTerm: string, searchOptions: SearchInWorkspaceOptions): Promise<void> {
         this.searchTerm = searchTerm;
+        this.searchOptions = searchOptions;
         searchOptions = {
             ...searchOptions,
             exclude: this.getExcludeGlobs(searchOptions.exclude)
@@ -560,7 +638,7 @@ export class SearchInWorkspaceResultTreeWidget extends TreeWidget {
         const fileUri = uri.withScheme('file').toString();
         for (const rootFolderNode of this.resultTree.values()) {
             const rootUri = new URI(rootFolderNode.path).withScheme('file');
-            if (rootUri.isEqualOrParent(uri)) {
+            if (rootUri.isEqualOrParent(uri) || rootFolderNode.id === this.defaultRootName) {
                 for (const fileNode of rootFolderNode.children) {
                     if (fileNode.fileUri === fileUri) {
                         nodes.push(fileNode);
