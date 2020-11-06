@@ -22,7 +22,8 @@ import { Command, CommandContribution, CommandRegistry } from '@theia/core/lib/c
 import {
     FrontendApplicationContribution, ApplicationShell,
     NavigatableWidget, NavigatableWidgetOptions,
-    Saveable, WidgetManager, StatefulWidget, FrontendApplication, ExpandableTreeNode, waitForClosed
+    Saveable, WidgetManager, StatefulWidget, FrontendApplication, ExpandableTreeNode, waitForClosed,
+    CorePreferences
 } from '@theia/core/lib/browser';
 import { MimeService } from '@theia/core/lib/browser/mime-service';
 import { TreeWidgetSelection } from '@theia/core/lib/browser/tree/tree-widget-selection';
@@ -63,6 +64,9 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
     @inject(FileSystemPreferences)
     protected readonly preferences: FileSystemPreferences;
 
+    @inject(CorePreferences)
+    protected readonly corePreferences: CorePreferences;
+
     @inject(SelectionService)
     protected readonly selectionService: SelectionService;
 
@@ -73,6 +77,7 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
     protected readonly fileService: FileService;
 
     protected readonly userOperations = new Map<number, Deferred<void>>();
+    private closeOnFileDelete: boolean = false;
     protected queueUserOperation(event: UserFileOperationEvent): void {
         const moveOperation = new Deferred<void>();
         this.userOperations.set(event.correlationId, moveOperation);
@@ -104,6 +109,11 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
 
     onStart?(app: FrontendApplication): MaybePromise<void> {
         this.updateAssociations();
+        this.corePreferences.onPreferenceChanged(e => {
+            if (e.preferenceName === 'workbench.editor.closeOnFileDelete') {
+                this.closeOnFileDelete = this.corePreferences['workbench.editor.closeOnFileDelete'];
+            }
+        });
         this.preferences.onPreferenceChanged(e => {
             if (e.preferenceName === 'files.associations') {
                 this.updateAssociations();
@@ -258,7 +268,7 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
         return targetUri && widget.createMoveToUri(targetUri);
     }
 
-    protected readonly deletedSuffix = ' (deleted from disk)';
+    protected readonly deletedSuffix = ' (deleted)';
     protected async updateWidgets(event: FileChangesEvent): Promise<void> {
         if (!event.gotDeleted() && !event.gotAdded()) {
             return;
@@ -273,10 +283,12 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
         }
         for (const [uriString, widgets] of toClose.entries()) {
             if (!dirty.has(uriString)) {
-                for (const widget of widgets) {
-                    widget.close();
-                    pending.push(waitForClosed(widget));
-                }
+                widgets.forEach(w => {
+                    if (this.closeOnFileDelete) {
+                        w.close();
+                        pending.push(waitForClosed(w));
+                    }
+                });
             }
         }
 
@@ -291,10 +303,10 @@ export class FileSystemFrontendContribution implements FrontendApplicationContri
         if (event.contains(uri, FileChangeType.DELETED)) {
             const uriString = uri.toString();
             if (Saveable.isDirty(widget)) {
-                if (!deleted) {
-                    widget.title.label += this.deletedSuffix;
-                }
                 dirty.add(uriString);
+            }
+            if (!deleted) {
+                widget.title.label += this.deletedSuffix;
             }
             const widgets = toClose.get(uriString) || [];
             widgets.push(widget);
