@@ -19,7 +19,7 @@ import { CommandContribution, CommandRegistry, MenuContribution, MenuModelRegist
 import { isOSX, environment, OS } from '@theia/core';
 import {
     open, OpenerService, CommonMenus, StorageService, LabelProvider,
-    ConfirmDialog, KeybindingRegistry, KeybindingContribution, CommonCommands, FrontendApplicationContribution
+    ConfirmDialog, KeybindingRegistry, KeybindingContribution, CommonCommands, FrontendApplicationContribution, Saveable
 } from '@theia/core/lib/browser';
 import { FileDialogService, OpenFileDialogProps, FileDialogTreeFilters } from '@theia/filesystem/lib/browser';
 import { ContextKeyService } from '@theia/core/lib/browser/context-key-service';
@@ -418,10 +418,15 @@ export class WorkspaceFrontendContribution implements CommandContribution, Keybi
         } while (selected && exist && !overwrite);
         if (selected) {
             try {
+                await this.commandRegistry.executeCommand(CommonCommands.SAVE.id);
                 if (uri === selected) {
-                    await this.commandRegistry.executeCommand(CommonCommands.SAVE.id);
+                    return;
                 }
+                const saveable = Saveable.get(uri);
                 await this.fileService.copy(uri, selected, { overwrite });
+                if (saveable?.revert) {
+                    await saveable.revert();
+                }
                 await open(this.openerService, selected);
             } catch (e) {
                 console.warn(e);
