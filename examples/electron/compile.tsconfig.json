@@ -124,6 +124,9 @@
     },
     {
       "path": "../../packages/timeline/compile.tsconfig.json"
+    },
+    {
+      "path": "../../packages/terminal-external/compile.tsconfig.json"
     }
   ]
 }
