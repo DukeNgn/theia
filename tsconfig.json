@@ -171,6 +171,9 @@
       ],
       "@theia/timeline/*": [
         "packages/timeline/*"
+      ],
+      "@theia/terminal-external/lib/*": [
+        "packages/terminal-external/src/*"
       ]
     }
   }
