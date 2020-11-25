@@ -48,6 +48,7 @@
     "@theia/search-in-workspace": "1.11.0",
     "@theia/task": "1.11.0",
     "@theia/terminal": "1.11.0",
+    "@theia/terminal-external": "1.11.0",
     "@theia/timeline": "1.11.0",
     "@theia/typehierarchy": "1.11.0",
     "@theia/userstorage": "1.11.0",

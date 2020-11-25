@@ -116,6 +116,9 @@
       "path": "../packages/terminal/compile.tsconfig.json"
     },
     {
+      "path": "../packages/terminal-external/compile.tsconfig.json"
+    },
+    {
       "path": "../packages/typehierarchy/compile.tsconfig.json"
     },
     {

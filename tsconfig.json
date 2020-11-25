@@ -136,6 +136,9 @@
       "@theia/terminal/lib/*": [
         "packages/terminal/src/*"
       ],
+      "@theia/terminal-external/lib/*": [
+        "packages/terminal-external/src/*"
+      ],
       "@theia/typehierarchy/lib/*": [
         "packages/typehierarchy/src/*"
       ],
