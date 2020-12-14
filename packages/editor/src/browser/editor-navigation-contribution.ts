@@ -23,6 +23,7 @@ import { CommandRegistry } from '@theia/core/lib/common/command';
 import { EditorCommands } from './editor-command';
 import { EditorWidget } from './editor-widget';
 import { EditorManager } from './editor-manager';
+import { EditorHistory } from './editor-history';
 import { TextEditor, Position, Range, TextDocumentChangeEvent } from './editor';
 import { NavigationLocation } from './navigation/navigation-location';
 import { NavigationLocationService } from './navigation/navigation-location-service';
@@ -53,6 +54,9 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
 
     @inject(CommandRegistry)
     protected readonly commandRegistry: CommandRegistry;
+
+    @inject(EditorHistory)
+    protected readonly editorHistory: EditorHistory;
 
     @postConstruct()
     protected init(): void {
@@ -91,6 +95,9 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
             execute: () => this.toggleWordWrap(),
             isEnabled: () => true,
         });
+        this.commandRegistry.registerHandler(EditorCommands.REOPEN_CLOSED_EDITOR.id, {
+            execute: () => this.reopenClosedEditor()
+        });
     }
 
     async onStart(): Promise<void> {
@@ -104,6 +111,16 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
 
     dispose(): void {
         this.toDispose.dispose();
+    }
+
+    /**
+     * Reopen most recently closed editor.
+     */
+    protected async reopenClosedEditor(): Promise<void> {
+        const recentEditor = this.editorHistory.mostRecentClosedEditor();
+        if (recentEditor) {
+            this.editorManager.open(recentEditor.fileUri);
+        }
     }
 
     /**

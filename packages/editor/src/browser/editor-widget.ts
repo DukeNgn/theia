@@ -14,12 +14,15 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { Disposable, SelectionService, Event } from '@theia/core/lib/common';
+import { Disposable, SelectionService, Event, Emitter } from '@theia/core/lib/common';
 import { Widget, BaseWidget, Message, Saveable, SaveableSource, Navigatable, StatefulWidget } from '@theia/core/lib/browser';
 import URI from '@theia/core/lib/common/uri';
 import { TextEditor } from './editor';
 
 export class EditorWidget extends BaseWidget implements SaveableSource, Navigatable, StatefulWidget {
+
+    protected readonly onEditorClosedEmitter = new Emitter<TextEditor | undefined>();
+    readonly onEditorClosed: Event<TextEditor | undefined> = this.onEditorClosedEmitter.event;
 
     constructor(
         readonly editor: TextEditor,
@@ -37,6 +40,7 @@ export class EditorWidget extends BaseWidget implements SaveableSource, Navigata
             if (this.selectionService.selection === this.editor) {
                 this.selectionService.selection = undefined;
             }
+            this.onEditorClosedEmitter.fire(this.editor);
         }));
     }
 

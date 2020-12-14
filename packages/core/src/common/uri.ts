@@ -199,21 +199,14 @@ export default class URI {
         return this.codeUri.toString(skipEncoding);
     }
 
-    private hasSameSchemeAuthority(uri: URI): boolean {
-        return (this.authority === uri.authority) && (this.scheme === uri.scheme);
-    }
-
     isEqual(uri: URI, caseSensitive: boolean = true): boolean {
         if (!this.hasSameSchemeAuthority(uri)) {
             return false;
         }
 
-        if (!caseSensitive && this.toString().toLowerCase() === uri.toString().toLowerCase()) {
-            return true;
-        }
-
-        return (!caseSensitive && this.toString().toLowerCase() === uri.toString().toLowerCase())
-            || (this.toString() === uri.toString());
+        return caseSensitive
+            ? this.toString() === uri.toString()
+            : this.toString().toLowerCase() === uri.toString().toLowerCase();
     }
 
     isEqualOrParent(uri: URI, caseSensitive: boolean = true): boolean {
@@ -239,4 +232,7 @@ export default class URI {
         return result;
     }
 
+    private hasSameSchemeAuthority(uri: URI): boolean {
+        return (this.authority === uri.authority) && (this.scheme === uri.scheme);
+    }
 }
