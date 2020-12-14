@@ -27,6 +27,7 @@ import { TextEditor, Position, Range, TextDocumentChangeEvent } from './editor';
 import { NavigationLocation } from './navigation/navigation-location';
 import { NavigationLocationService } from './navigation/navigation-location-service';
 import { PreferenceService, PreferenceScope } from '@theia/core/lib/browser';
+import URI from '@theia/core/lib/common/uri';
 
 @injectable()
 export class EditorNavigationContribution implements Disposable, FrontendApplicationContribution {
@@ -91,6 +92,11 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
             execute: () => this.toggleWordWrap(),
             isEnabled: () => true,
         });
+        this.commandRegistry.registerHandler(EditorCommands.REOPEN_CLOSED_EDITOR.id, {
+            execute: () => this.reopenClosedEditor(),
+            isEnabled: () => !!this.getMostRecentOpenedUri(),
+            isVisible: () => !!this.getMostRecentOpenedUri(),
+        });
     }
 
     async onStart(): Promise<void> {
@@ -104,6 +110,30 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
 
     dispose(): void {
         this.toDispose.dispose();
+    }
+
+    /**
+     * Reopen most recent closed editor.
+     */
+    protected async reopenClosedEditor(): Promise<void> {
+        const recentUri = this.getMostRecentOpenedUri();
+        if (recentUri) {
+            this.editorManager.open(recentUri);
+        }
+    }
+
+    /**
+     * Get the most recent opened URI.
+     */
+    protected getMostRecentOpenedUri(): URI | undefined {
+        let locationURIs = [...this.locationStack.locations().map(l => l.uri)].reverse();
+        locationURIs = locationURIs.filter(uri => uri.scheme === 'file');
+        // Remove consecutive duplicate URIs.
+        locationURIs = locationURIs.filter(function (item, index, array): boolean {
+            return index === 0 || item !== array[index - 1];
+        });
+        // Return the first URI found in the stack that is not opened.
+        return locationURIs.find(uri => !this.editorManager.all.some(e => e.editor.uri.isEqualOrParent(uri)));
     }
 
     /**
