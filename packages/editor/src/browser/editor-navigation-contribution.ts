@@ -91,6 +91,9 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
             execute: () => this.toggleWordWrap(),
             isEnabled: () => true,
         });
+        this.commandRegistry.registerHandler(EditorCommands.REOPEN_CLOSED_EDITOR.id, {
+            execute: () => this.editorManager.reopenLastClosedEditor(),
+        });
     }
 
     async onStart(): Promise<void> {

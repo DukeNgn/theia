@@ -22,6 +22,7 @@ import { EditorWidget } from './editor-widget';
 import { Range, Position, Location } from './editor';
 import { EditorWidgetFactory } from './editor-widget-factory';
 import { TextEditor } from './editor';
+import { NavigationLocationService } from './navigation/navigation-location-service';
 
 export interface EditorOpenerOptions extends WidgetOpenerOptions {
     selection?: RecursivePartial<Range>;
@@ -30,6 +31,9 @@ export interface EditorOpenerOptions extends WidgetOpenerOptions {
 
 @injectable()
 export class EditorManager extends NavigatableWidgetOpenHandler<EditorWidget> {
+
+    @inject(NavigationLocationService)
+    protected readonly navigationLocationService: NavigationLocationService;
 
     readonly id = EditorWidgetFactory.ID;
 
@@ -64,6 +68,7 @@ export class EditorManager extends NavigatableWidgetOpenHandler<EditorWidget> {
             widget.disposed.connect(() => {
                 this.removeRecentlyVisible(widget);
                 this.updateCurrentEditor();
+                this.navigationLocationService.addToRecentlyClosedEditors(widget);
             });
         });
         for (const widget of this.all) {
@@ -189,6 +194,26 @@ export class EditorManager extends NavigatableWidgetOpenHandler<EditorWidget> {
         };
     }
 
+    /**
+     * Reopens the last closed editor.
+     */
+    async reopenLastClosedEditor(): Promise<void> {
+        const lastClosedEditor = this.navigationLocationService.getLastClosedEditor();
+        if (lastClosedEditor === undefined) {
+            return;
+        }
+        // Continue to the next closed editor in the history if the editor is already opened.
+        if (this.all.find(e => e.editor.uri.isEqual(lastClosedEditor.editor.uri))) {
+            this.reopenLastClosedEditor();
+            return;
+        }
+        // Continue to the next closed editor in the history if the editor cannot be opened successfully.
+        try {
+            await this.open(lastClosedEditor.editor.uri);
+        } catch (e) {
+            this.reopenLastClosedEditor();
+        }
+    }
 }
 
 /**

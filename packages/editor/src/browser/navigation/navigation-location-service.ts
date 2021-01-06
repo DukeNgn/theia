@@ -21,6 +21,7 @@ import { EditorOpenerOptions } from '../editor-manager';
 import { NavigationLocationUpdater } from './navigation-location-updater';
 import { NavigationLocationSimilarity } from './navigation-location-similarity';
 import { NavigationLocation, Range, ContentChangeLocation } from './navigation-location';
+import { EditorWidget } from '../editor-widget';
 
 /**
  * The navigation location service. Also, stores and manages navigation locations.
@@ -29,6 +30,7 @@ import { NavigationLocation, Range, ContentChangeLocation } from './navigation-l
 export class NavigationLocationService {
 
     private static MAX_STACK_ITEMS = 30;
+    private static readonly MAX_RECENTLY_CLOSED_EDITORS = 30;
 
     @inject(ILogger)
     protected readonly logger: ILogger;
@@ -46,6 +48,8 @@ export class NavigationLocationService {
     protected stack: NavigationLocation[] = [];
     protected canRegister = true;
     protected _lastEditLocation: ContentChangeLocation | undefined;
+
+    protected recentlyClosedEditors: EditorWidget[] = [];
 
     /**
      * Registers the give locations into the service.
@@ -165,12 +169,13 @@ export class NavigationLocationService {
     }
 
     /**
-     * Clears the navigation history.
+     * Clears the total history.
      */
     clearHistory(): void {
         this.stack = [];
         this.pointer = -1;
         this._lastEditLocation = undefined;
+        this.recentlyClosedEditors = [];
     }
 
     /**
@@ -231,6 +236,38 @@ export class NavigationLocationService {
 Pointer: ${this.pointer}
 ${this.stack.map((location, i) => `${i}: ${JSON.stringify(NavigationLocation.toObject(location))}`).join('\n')}
 ----- o -----`;
+    }
+
+    /**
+     * Get the last recently closed editor.
+     *
+     * @returns the recently closed editor if it exists.
+     */
+    getLastClosedEditor(): EditorWidget | undefined {
+        return this.recentlyClosedEditors.pop();
+    }
+
+    /**
+     * Adds the recently closed editor the history.
+     * @param editor the recently closed editor.
+     */
+    addToRecentlyClosedEditors(editor: EditorWidget): void {
+        this.removeFromRecentlyClosedEditors(editor);
+        this.recentlyClosedEditors.push(editor);
+
+        // Removes the oldest entry from the history if the maximum size is reached.
+        if (this.recentlyClosedEditors.length > NavigationLocationService.MAX_RECENTLY_CLOSED_EDITORS) {
+            this.recentlyClosedEditors.shift();
+        }
+    }
+
+    /**
+     * Removes all occurences of the given editor in the history if they exist.
+     *
+     * @param target the editor that should be removed from the history.
+     */
+    private removeFromRecentlyClosedEditors(target: EditorWidget): void {
+        this.recentlyClosedEditors = this.recentlyClosedEditors.filter(e => !target.editor.uri.isEqual(e.editor.uri));
     }
 
 }
