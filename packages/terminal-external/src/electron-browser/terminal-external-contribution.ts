@@ -21,21 +21,19 @@ import {
     CommandRegistry
 } from '@theia/core/lib/common';
 import { EnvVariablesServer } from '@theia/core/lib/common/env-variables';
-import { isWindows, isOSX } from '@theia/core/lib/common/os';
 import { QuickPickService } from '@theia/core/lib/common/quick-pick-service';
 import {
     FrontendApplication,
     FrontendApplicationContribution,
     KeybindingContribution,
     KeybindingRegistry,
-    LabelProvider,
-    PreferenceService
+    LabelProvider
 } from '@theia/core/lib/browser';
 import { FrontendApplicationStateService } from '@theia/core/lib/browser/frontend-application-state';
 import { EditorManager } from '@theia/editor/lib/browser/editor-manager';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
-import { TerminalExternalService, TerminalExternalConfiguration } from '../common/terminal-external';
-import { TerminalExternalPreferences } from './terminal-external-preference';
+import { TerminalExternalService } from '../common/terminal-external';
+import { TerminalExternalPreferencesService } from './terminal-external-preference';
 
 export namespace TerminalExternalCommands {
     export const OPEN_NATIVE_CONSOLE: Command = {
@@ -54,29 +52,26 @@ export class TerminalExternalFrontendContribution implements FrontendApplication
     private readonly envVariablesServer: EnvVariablesServer;
 
     @inject(FrontendApplicationStateService)
-    protected readonly stateService: FrontendApplicationStateService;
+    private readonly stateService: FrontendApplicationStateService;
 
     @inject(LabelProvider)
-    protected readonly labelProvider: LabelProvider;
-
-    @inject(PreferenceService)
-    protected readonly preferences: PreferenceService;
+    private readonly labelProvider: LabelProvider;
 
     @inject(QuickPickService)
     private readonly quickPickService: QuickPickService;
 
-    @inject(TerminalExternalPreferences)
-    protected readonly terminalExternalPreferences: TerminalExternalPreferences;
-
     @inject(TerminalExternalService)
     private readonly terminalExternalService: TerminalExternalService;
+
+    @inject(TerminalExternalPreferencesService)
+    private readonly terminalExternalPreferences: TerminalExternalPreferencesService;
 
     @inject(WorkspaceService)
     private readonly workspaceService: WorkspaceService;
 
     async onStart(app: FrontendApplication): Promise<void> {
         this.stateService.reachedState('ready').then(
-            () => this.setHostPreferenceExec()
+            () => this.terminalExternalPreferences.setHostPreferenceExec()
         );
     }
 
@@ -94,24 +89,10 @@ export class TerminalExternalFrontendContribution implements FrontendApplication
     }
 
     /**
-     * Set the correct exec path based on host machine.
-     */
-    protected async setHostPreferenceExec(): Promise<void> {
-        const hostExec = await this.terminalExternalService.getDefaultExec();
-        if (isWindows) {
-            await this.preferences.set('terminal.external.windowsExec', hostExec);
-        } else if (isOSX) {
-            await this.preferences.set('terminal.external.osxExec', hostExec);
-        } else {
-            await this.preferences.set('terminal.external.linuxExec', hostExec);
-        }
-    }
-
-    /**
      * Open native console on host machine.
      */
     protected async openTerminalExternal(): Promise<void> {
-        const configuration = this.getTerminalExternalConfiguration();
+        const configuration = this.terminalExternalPreferences.getTerminalExternalConfiguration();
 
         // Multi-root workspace opened.
         if (this.workspaceService.isMultiRootWorkspaceOpened) {
@@ -141,17 +122,6 @@ export class TerminalExternalFrontendContribution implements FrontendApplication
             const userHomeDir = await this.envVariablesServer.getHomeDirUri();
             await this.terminalExternalService.openTerminal(configuration, userHomeDir);
         }
-    }
-
-    /**
-     * Get the external terminal configurations from preferences.
-     */
-    protected getTerminalExternalConfiguration(): TerminalExternalConfiguration {
-        return {
-            'terminal.external.linuxExec': this.terminalExternalPreferences['terminal.external.linuxExec'],
-            'terminal.external.osxExec': this.terminalExternalPreferences['terminal.external.osxExec'],
-            'terminal.external.windowsExec': this.terminalExternalPreferences['terminal.external.windowsExec']
-        };
     }
 
     /**

@@ -14,7 +14,7 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { interfaces } from 'inversify';
+import { inject, injectable, interfaces } from 'inversify';
 import {
     createPreferenceProxy,
     PreferenceProxy,
@@ -22,7 +22,8 @@ import {
     PreferenceService,
     PreferenceContribution
 } from '@theia/core/lib/browser';
-import { TerminalExternalConfiguration } from '../common/terminal-external';
+import { isWindows, isOSX } from '@theia/core/lib/common/os';
+import { TerminalExternalService, TerminalExternalConfiguration } from '../common/terminal-external';
 
 export const TerminalExternalConfigSchema: PreferenceSchema = {
     type: 'object',
@@ -58,4 +59,43 @@ export function bindTerminalExternalPreferences(bind: interfaces.Bind): void {
         return createTerminalExternalPreferences(preferences);
     });
     bind(PreferenceContribution).toConstantValue({ schema: TerminalExternalConfigSchema });
+    bind(TerminalExternalPreferencesService).toSelf().inSingletonScope();
+}
+
+@injectable()
+export class TerminalExternalPreferencesService {
+
+    @inject(PreferenceService)
+    private readonly preferences: PreferenceService;
+
+    @inject(TerminalExternalService)
+    private readonly terminalExternalService: TerminalExternalService;
+
+    @inject(TerminalExternalPreferences)
+    private readonly terminalExternalPreferences: TerminalExternalPreferences;
+
+    /**
+     * Set the correct exec path based on host machine.
+     */
+    async setHostPreferenceExec(): Promise<void> {
+        const hostExec = await this.terminalExternalService.getDefaultExec();
+        if (isWindows) {
+            await this.preferences.set('terminal.external.windowsExec', hostExec);
+        } else if (isOSX) {
+            await this.preferences.set('terminal.external.osxExec', hostExec);
+        } else {
+            await this.preferences.set('terminal.external.linuxExec', hostExec);
+        }
+    }
+
+    /**
+     * Get the external terminal configurations from preferences.
+     */
+    getTerminalExternalConfiguration(): TerminalExternalConfiguration {
+        return {
+            'terminal.external.linuxExec': this.terminalExternalPreferences['terminal.external.linuxExec'],
+            'terminal.external.osxExec': this.terminalExternalPreferences['terminal.external.osxExec'],
+            'terminal.external.windowsExec': this.terminalExternalPreferences['terminal.external.windowsExec']
+        };
+    }
 }
