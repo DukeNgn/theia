@@ -25,7 +25,7 @@ import {
 import { TerminalExternalConfiguration } from '../common/terminal-external';
 
 // The default terminal paths to be displayed on preferences.
-const defaultTerminalLinux = 'x-terminal-emulator';
+const defaultTerminalLinux = 'xterm';
 const defaultTerminalOSX = 'Terminal.app';
 const defaultTerminalWindows = 'C:\\WINDOWS\\System32\\cmd.exe';
 

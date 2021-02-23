@@ -77,6 +77,10 @@ export class WindowsTerminalExternalService implements TerminalExternalService {
         });
     }
 
+    async getDefaultExec(): Promise<string> {
+        return WindowsTerminalExternalService.getDefaultTerminalWindows();
+    }
+
     /**
      * Get the default terminal app on Windows.
      * (determine and initialize the variable if not found).
@@ -122,6 +126,10 @@ export class MacTerminalExternalService implements TerminalExternalService {
         });
     }
 
+    async getDefaultExec(): Promise<string> {
+        return MacTerminalExternalService.getDefaultTerminalOSX();
+    }
+
     /**
      * Get the default terminal app on OSX.
      */
@@ -150,6 +158,10 @@ export class LinuxTerminalExternalService implements TerminalExternalService {
                 child.on('exit', () => c());
             });
         });
+    }
+
+    async getDefaultExec(): Promise<string> {
+        return LinuxTerminalExternalService.getDefaultTerminalLinux();
     }
 
     /**
