@@ -20,14 +20,21 @@ import {
     CommandRegistry,
     Command
 } from '@theia/core/lib/common';
-import { LabelProvider } from '@theia/core/lib/browser';
-import { KeybindingContribution, KeybindingRegistry } from '@theia/core/lib/browser';
 import { EnvVariablesServer } from '@theia/core/lib/common/env-variables';
+import { isWindows, isOSX } from '@theia/core/lib/common/os';
 import { QuickPickService } from '@theia/core/lib/common/quick-pick-service';
-import { WorkspaceService } from '@theia/workspace/lib/browser';
+import {
+    FrontendApplication,
+    KeybindingContribution,
+    KeybindingRegistry,
+    LabelProvider,
+    PreferenceService
+} from '@theia/core/lib/browser';
+import { FrontendApplicationStateService } from '@theia/core/lib/browser/frontend-application-state';
 import { EditorManager } from '@theia/editor/lib/browser/editor-manager';
-import { TerminalExternalPreferences } from './terminal-external-preference';
+import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { TerminalExternalService, TerminalExternalConfiguration } from '../common/terminal-external';
+import { TerminalExternalPreferences } from './terminal-external-preference';
 
 export namespace TerminalExternalCommands {
     export const OPEN_NATIVE_CONSOLE: Command = {
@@ -45,8 +52,14 @@ export class TerminalExternalFrontendContribution implements CommandContribution
     @inject(EnvVariablesServer)
     private readonly envVariablesServer: EnvVariablesServer;
 
+    @inject(FrontendApplicationStateService)
+    protected readonly stateService: FrontendApplicationStateService;
+
     @inject(LabelProvider)
     protected readonly labelProvider: LabelProvider;
+
+    @inject(PreferenceService)
+    protected readonly preferences: PreferenceService;
 
     @inject(QuickPickService)
     private readonly quickPickService: QuickPickService;
@@ -60,6 +73,12 @@ export class TerminalExternalFrontendContribution implements CommandContribution
     @inject(WorkspaceService)
     private readonly workspaceService: WorkspaceService;
 
+    async onStart(app: FrontendApplication): Promise<void> {
+        this.stateService.reachedState('ready').then(
+            () => this.setHostPreferenceExec()
+        );
+    }
+
     registerCommands(commands: CommandRegistry): void {
         commands.registerCommand(TerminalExternalCommands.OPEN_NATIVE_CONSOLE, {
             execute: () => this.openTerminalExternal()
@@ -71,6 +90,20 @@ export class TerminalExternalFrontendContribution implements CommandContribution
             command: TerminalExternalCommands.OPEN_NATIVE_CONSOLE.id,
             keybinding: 'shift+ctrlcmd+c'
         });
+    }
+
+    /**
+     * Set the correct exec path based on host machine.
+     */
+    protected async setHostPreferenceExec(): Promise<void> {
+        const hostExec = await this.terminalExternalService.getDefaultExec();
+        if (isWindows) {
+            await this.preferences.set('terminal.external.windowsExec', hostExec);
+        } else if (isOSX) {
+            await this.preferences.set('terminal.external.osxExec', hostExec);
+        } else {
+            await this.preferences.set('terminal.external.linuxExec', hostExec);
+        }
     }
 
     /**

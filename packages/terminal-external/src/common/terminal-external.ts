@@ -30,4 +30,9 @@ export interface TerminalExternalService {
      * @param cwd the string that terminal should start in.
      */
     openTerminal(configuration: TerminalExternalConfiguration, cwd: string): Promise<void>;
+    /**
+     * Determine the default exec of the external terminal.
+     * @returns the string of the default terminal exec.
+     */
+    getDefaultExec(): Promise<string>;
 }
