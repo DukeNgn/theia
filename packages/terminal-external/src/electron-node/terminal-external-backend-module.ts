@@ -17,8 +17,12 @@
 import { ContainerModule, interfaces } from 'inversify';
 import { ConnectionHandler, JsonRpcConnectionHandler } from '@theia/core/lib/common';
 import { isWindows, isOSX } from '@theia/core/lib/common/os';
+import {
+    WindowsTerminalExternalService,
+    MacTerminalExternalService,
+    LinuxTerminalExternalService
+} from './terminal-external-service';
 import { TerminalExternalService, terminalExternalServicePath } from '../common/terminal-external';
-import { WindowsTerminalExternalService, MacTerminalExternalService, LinuxTerminalExternalService } from './terminal-external-service';
 
 export function bindTerminalExternalService(bind: interfaces.Bind): void {
     if (isWindows) {

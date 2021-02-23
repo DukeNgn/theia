@@ -24,28 +24,23 @@ import {
 } from '@theia/core/lib/browser';
 import { TerminalExternalConfiguration } from '../common/terminal-external';
 
-// The default terminal paths to be displayed on preferences.
-const defaultTerminalLinux = 'xterm';
-const defaultTerminalOSX = 'Terminal.app';
-const defaultTerminalWindows = 'C:\\WINDOWS\\System32\\cmd.exe';
-
 export const TerminalExternalConfigSchema: PreferenceSchema = {
     type: 'object',
     properties: {
         'terminal.external.windowsExec': {
             type: 'string',
             description: 'Customizes which terminal to run on Windows.',
-            default: defaultTerminalWindows
+            default: 'C:\\WINDOWS\\System32\\cmd.exe'
         },
         'terminal.external.osxExec': {
             type: 'string',
             description: 'Customizes which terminal application to run on macOS.',
-            default: defaultTerminalOSX
+            default: 'Terminal.app'
         },
         'terminal.external.linuxExec': {
             type: 'string',
             description: 'Customizes which terminal to run on Linux.',
-            default: defaultTerminalLinux
+            default: 'xterm'
         }
     }
 };

@@ -25,14 +25,14 @@ export interface TerminalExternalConfiguration {
 
 export interface TerminalExternalService {
     /**
-     * Open native terminal in the provided path.
-     * @param configuration the configuration for opening external terminal.
-     * @param cwd the string that terminal should start in.
+     * Open a native terminal at the current working directory.
+     * @param configuration the configuration for opening external terminals.
+     * @param cwd the current working directory where the terminal should open from.
      */
     openTerminal(configuration: TerminalExternalConfiguration, cwd: string): Promise<void>;
     /**
      * Determine the default exec of the external terminal.
-     * @returns the string of the default terminal exec.
+     * @returns the default terminal exec.
      */
     getDefaultExec(): Promise<string>;
 }
