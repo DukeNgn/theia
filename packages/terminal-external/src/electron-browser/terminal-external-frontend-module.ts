@@ -16,9 +16,13 @@
 
 import { ContainerModule, interfaces } from 'inversify';
 import { CommandContribution } from '@theia/core/lib/common';
-import { FrontendApplicationContribution, KeybindingContribution, WebSocketConnectionProvider } from '@theia/core/lib/browser';
-import { TerminalExternalFrontendContribution } from './terminal-external-contribution';
+import {
+    FrontendApplicationContribution,
+    KeybindingContribution,
+    WebSocketConnectionProvider
+} from '@theia/core/lib/browser';
 import { bindTerminalExternalPreferences } from './terminal-external-preference';
+import { TerminalExternalFrontendContribution } from './terminal-external-contribution';
 import { TerminalExternalService, terminalExternalServicePath } from '../common/terminal-external';
 
 export default new ContainerModule((bind: interfaces.Bind) => {

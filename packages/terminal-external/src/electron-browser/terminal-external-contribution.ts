@@ -14,17 +14,18 @@
  * SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
  ********************************************************************************/
 
-import { injectable, inject } from 'inversify';
+import { inject, injectable } from 'inversify';
 import {
+    Command,
     CommandContribution,
-    CommandRegistry,
-    Command
+    CommandRegistry
 } from '@theia/core/lib/common';
 import { EnvVariablesServer } from '@theia/core/lib/common/env-variables';
 import { isWindows, isOSX } from '@theia/core/lib/common/os';
 import { QuickPickService } from '@theia/core/lib/common/quick-pick-service';
 import {
     FrontendApplication,
+    FrontendApplicationContribution,
     KeybindingContribution,
     KeybindingRegistry,
     LabelProvider,
@@ -44,7 +45,7 @@ export namespace TerminalExternalCommands {
 }
 
 @injectable()
-export class TerminalExternalFrontendContribution implements CommandContribution, KeybindingContribution {
+export class TerminalExternalFrontendContribution implements FrontendApplicationContribution, CommandContribution, KeybindingContribution {
 
     @inject(EditorManager)
     private readonly editorManager: EditorManager;
