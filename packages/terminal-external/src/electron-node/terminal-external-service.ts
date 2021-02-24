@@ -88,8 +88,7 @@ export class WindowsTerminalExternalService implements TerminalExternalService {
     public static getDefaultTerminalWindows(): string {
         if (!WindowsTerminalExternalService.DEFAULT_TERMINAL_WINDOWS) {
             const isWoW64 = !!process.env.hasOwnProperty('PROCESSOR_ARCHITEW6432');
-            WindowsTerminalExternalService.DEFAULT_TERMINAL_WINDOWS = `${process.env.windir ? process.env.windir : 'C:\\Windows'}\\
-            ${isWoW64 ? 'Sysnative' : 'System32'}\\cmd.exe`;
+            WindowsTerminalExternalService.DEFAULT_TERMINAL_WINDOWS = `${process.env.windir ? process.env.windir : 'C:\\Windows'}\\${isWoW64 ? 'Sysnative' : 'System32'}\\cmd.exe`;
         }
         return WindowsTerminalExternalService.DEFAULT_TERMINAL_WINDOWS;
     }
