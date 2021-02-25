@@ -19,6 +19,7 @@ import {
     createPreferenceProxy,
     PreferenceProxy,
     PreferenceSchema,
+    PreferenceScope,
     PreferenceService,
     PreferenceContribution
 } from '@theia/core/lib/browser';
@@ -80,11 +81,11 @@ export class TerminalExternalPreferencesService {
     async setHostPreferenceExec(): Promise<void> {
         const hostExec = await this.terminalExternalService.getDefaultExec();
         if (isWindows) {
-            await this.preferences.set('terminal.external.windowsExec', hostExec);
+            await this.preferences.set('terminal.external.windowsExec', hostExec, PreferenceScope.Default);
         } else if (isOSX) {
-            await this.preferences.set('terminal.external.osxExec', hostExec);
+            await this.preferences.set('terminal.external.osxExec', hostExec, PreferenceScope.Default);
         } else {
-            await this.preferences.set('terminal.external.linuxExec', hostExec);
+            await this.preferences.set('terminal.external.linuxExec', hostExec, PreferenceScope.Default);
         }
     }
 
