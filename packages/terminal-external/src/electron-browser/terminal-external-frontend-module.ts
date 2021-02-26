@@ -17,7 +17,7 @@
 import { ContainerModule, interfaces } from 'inversify';
 import { CommandContribution } from '@theia/core/lib/common';
 import {
-    FrontendApplicationContribution,
+    // FrontendApplicationContribution,
     KeybindingContribution,
     WebSocketConnectionProvider
 } from '@theia/core/lib/browser';
@@ -28,7 +28,7 @@ import { TerminalExternalService, terminalExternalServicePath } from '../common/
 export default new ContainerModule((bind: interfaces.Bind) => {
     bind(TerminalExternalFrontendContribution).toSelf().inSingletonScope();
 
-    bind(FrontendApplicationContribution).toService(TerminalExternalFrontendContribution);
+    // bind(FrontendApplicationContribution).toService(TerminalExternalFrontendContribution);
 
     [CommandContribution, KeybindingContribution].forEach(serviceIdentifier =>
         bind(serviceIdentifier).toService(TerminalExternalFrontendContribution)

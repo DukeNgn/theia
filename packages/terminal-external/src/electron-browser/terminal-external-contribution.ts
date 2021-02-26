@@ -23,13 +23,10 @@ import {
 import { EnvVariablesServer } from '@theia/core/lib/common/env-variables';
 import { QuickPickService } from '@theia/core/lib/common/quick-pick-service';
 import {
-    FrontendApplication,
-    FrontendApplicationContribution,
     KeybindingContribution,
     KeybindingRegistry,
     LabelProvider
 } from '@theia/core/lib/browser';
-import { FrontendApplicationStateService } from '@theia/core/lib/browser/frontend-application-state';
 import { EditorManager } from '@theia/editor/lib/browser/editor-manager';
 import { WorkspaceService } from '@theia/workspace/lib/browser';
 import { TerminalExternalService } from '../common/terminal-external';
@@ -43,16 +40,13 @@ export namespace TerminalExternalCommands {
 }
 
 @injectable()
-export class TerminalExternalFrontendContribution implements FrontendApplicationContribution, CommandContribution, KeybindingContribution {
+export class TerminalExternalFrontendContribution implements CommandContribution, KeybindingContribution {
 
     @inject(EditorManager)
     private readonly editorManager: EditorManager;
 
     @inject(EnvVariablesServer)
     private readonly envVariablesServer: EnvVariablesServer;
-
-    @inject(FrontendApplicationStateService)
-    private readonly stateService: FrontendApplicationStateService;
 
     @inject(LabelProvider)
     private readonly labelProvider: LabelProvider;
@@ -68,12 +62,6 @@ export class TerminalExternalFrontendContribution implements FrontendApplication
 
     @inject(WorkspaceService)
     private readonly workspaceService: WorkspaceService;
-
-    async onStart(app: FrontendApplication): Promise<void> {
-        this.stateService.reachedState('ready').then(
-            () => this.terminalExternalPreferences.setHostPreferenceExec()
-        );
-    }
 
     registerCommands(commands: CommandRegistry): void {
         commands.registerCommand(TerminalExternalCommands.OPEN_NATIVE_CONSOLE, {
