@@ -1246,7 +1246,8 @@ export const editorPreferenceSchema: PreferenceSchema = {
         'editor.autoSave': {
             'enum': [
                 'on',
-                'off'
+                'off',
+                'onFocusChange'
             ],
             'default': 'off',
             'description': 'Controls auto save of dirty files.',
@@ -1295,7 +1296,7 @@ export type CodeEditorConfiguration = {
 };
 
 export interface EditorConfiguration extends CodeEditorConfiguration {
-    'editor.autoSave': 'on' | 'off'
+    'editor.autoSave': 'on' | 'off' | 'onFocusChange'
     'editor.autoSaveDelay': number
     'editor.formatOnSave': boolean
     'editor.formatOnSaveTimeout': number

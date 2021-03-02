@@ -25,7 +25,7 @@ import { waitForClosed } from './widgets';
 export interface Saveable {
     readonly dirty: boolean;
     readonly onDirtyChanged: Event<void>;
-    readonly autoSave: 'on' | 'off';
+    readonly autoSave: 'on' | 'off' | 'onFocusChange';
     /**
      * Saves dirty changes.
      */

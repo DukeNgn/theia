@@ -47,7 +47,7 @@ export interface MonacoModelContentChangedEvent {
 
 export class MonacoEditorModel implements ITextEditorModel, TextEditorDocument {
 
-    autoSave: 'on' | 'off' = 'on';
+    autoSave: 'on' | 'off' | 'onFocusChange' = 'on';
     autoSaveDelay: number = 500;
     /* @deprecated there is no general save timeout, each participant should introduce a sensible timeout  */
     readonly onWillSaveLoopTimeOut = 1500;
