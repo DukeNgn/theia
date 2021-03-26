@@ -21,6 +21,7 @@ import { CommandService } from '../../common';
 import { ReactWidget } from '../widgets/react-widget';
 import { FrontendApplicationStateService } from '../frontend-application-state';
 import { LabelParser, LabelIcon } from '../label-parser';
+import { ContextMenuRenderer } from '../context-menu-renderer';
 
 export interface StatusBarEntry {
     /**
@@ -43,6 +44,7 @@ export interface StatusBarEntry {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     arguments?: any[];
     priority?: number;
+    visibility?: boolean;
     onclick?: (e: MouseEvent) => void;
 }
 
@@ -78,7 +80,8 @@ export class StatusBarImpl extends ReactWidget implements StatusBar {
     constructor(
         @inject(CommandService) protected readonly commands: CommandService,
         @inject(LabelParser) protected readonly entryService: LabelParser,
-        @inject(FrontendApplicationStateService) protected readonly applicationStateService: FrontendApplicationStateService
+        @inject(FrontendApplicationStateService) protected readonly applicationStateService: FrontendApplicationStateService,
+        @inject(ContextMenuRenderer) protected readonly contextMenuRenderer: ContextMenuRenderer
     ) {
         super();
         delete this.scrollOptions;
@@ -152,6 +155,24 @@ export class StatusBarImpl extends ReactWidget implements StatusBar {
                 this.commands.executeCommand(entry.command, ...args);
             }
         };
+    }
+
+    /**
+     * Handle the context menu click event.
+     * - The context menu event is triggered by the right click on an item.
+     *
+     * @param item the status bar item.
+     * @param event the right-click mouse event.
+     */
+    protected handleContextMenuEvent(item: StatusBarEntry, event: React.MouseEvent<HTMLElement>): void {
+        if (!item.visibility) {
+            return;
+        }
+
+        // const contextMenuPath = 'statusbar-context-' + item.className;
+
+        event.stopPropagation();
+        event.preventDefault();
     }
 
     protected createAttributes(entry: StatusBarEntry): StatusBarEntryAttributes {
