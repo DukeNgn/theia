@@ -218,7 +218,7 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
             locations: this.locationStack.locations().map(NavigationLocation.toObject)
         });
         this.storageService.setData(EditorNavigationContribution.CLOSED_EDITORS_KEY, {
-            closedEditors: this.locationStack.closedEditorsStack.map(RecentlyClosedEditor.toObject)
+            closedEditors: this.shouldRestoreClosedEditors() ? this.locationStack.closedEditorsStack.map(RecentlyClosedEditor.toObject) : []
         });
     }
 
@@ -246,6 +246,9 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
 
     protected async restoreClosedEditors(): Promise<void> {
         const raw: { closedEditors?: ArrayLike<object> } | undefined = await this.storageService.getData(EditorNavigationContribution.CLOSED_EDITORS_KEY);
+        if (!this.shouldRestoreClosedEditors) {
+            return;
+        }
         if (raw && raw.closedEditors) {
             for (let i = 0; i < raw.closedEditors.length; i++) {
                 const editor = RecentlyClosedEditor.fromObject(raw.closedEditors[i]);
@@ -265,6 +268,10 @@ export class EditorNavigationContribution implements Disposable, FrontendApplica
     private isRenderWhitespaceEnabled(): boolean {
         const renderWhitespace = this.preferenceService.get('editor.renderWhitespace');
         return renderWhitespace === 'none' ? false : true;
+    }
+
+    private shouldRestoreClosedEditors(): boolean {
+        return !!this.preferenceService.get('editor.persistClosedEditors');
     }
 
 }
