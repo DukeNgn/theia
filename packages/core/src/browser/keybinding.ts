@@ -23,7 +23,7 @@ import { KeyCode, KeySequence, Key } from './keyboard/keys';
 import { KeyboardLayoutService } from './keyboard/keyboard-layout-service';
 import { ContributionProvider } from '../common/contribution-provider';
 import { ILogger } from '../common/logger';
-import { StatusBarAlignment, StatusBar } from './status-bar/status-bar';
+// import { StatusBarAlignment, StatusBar } from './status-bar/status-bar';
 import { ContextKeyService } from './context-key-service';
 import { CorePreferences } from './core-preferences';
 import * as common from '../common/keybinding';
@@ -117,8 +117,8 @@ export class KeybindingRegistry {
     @inject(ContributionProvider) @named(KeybindingContribution)
     protected readonly contributions: ContributionProvider<KeybindingContribution>;
 
-    @inject(StatusBar)
-    protected readonly statusBar: StatusBar;
+    // @inject(StatusBar)
+    // protected readonly statusBar: StatusBar;
 
     @inject(ILogger)
     protected readonly logger: ILogger;
@@ -533,18 +533,20 @@ export class KeybindingRegistry {
             /* Accumulate the keysequence */
             event.preventDefault();
             event.stopPropagation();
-
+            /*
             this.statusBar.setElement('keybinding-status', {
                 text: `(${this.acceleratorForSequence(this.keySequence, '+')}) was pressed, waiting for more keys`,
                 alignment: StatusBarAlignment.LEFT,
                 priority: 2
             });
+            */
+
         } else {
             if (match && match.kind === 'full') {
                 this.executeKeyBinding(match.binding, event);
             }
             this.keySequence = [];
-            this.statusBar.removeElement('keybinding-status');
+            // this.statusBar.removeElement('keybinding-status');
         }
     }
 
