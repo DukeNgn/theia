@@ -43,7 +43,7 @@ export class PreferenceScopeCommandManager {
         folderWorkspaces.forEach(folderWorkspace => {
             const folderLabel = this.labelProvider.getName(folderWorkspace.resource);
 
-            const iconClass = currentFolderURI === folderWorkspace.resource.toString() ? 'fa fa-check' : '';
+            const iconClass = currentFolderURI === folderWorkspace.resource.toString() ? 'codicon codicon-check' : '';
             const newFolderAsCommand = {
                 id: `preferenceScopeCommand:${folderWorkspace.resource.toString()}`,
                 label: folderLabel,

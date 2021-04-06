@@ -50,7 +50,7 @@ export class TimelineContribution implements CommandContribution, TabBarToolbarC
         id: 'timeline-refresh-toolbar-item',
         command: 'timeline-refresh',
         tooltip: 'Refresh',
-        icon: 'fa fa-refresh'
+        icon: 'codicon codicon-refresh'
     };
     registerToolbarItems(registry: TabBarToolbarRegistry): void {
         registry.registerItem(this.toolbarItem);

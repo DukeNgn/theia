@@ -84,13 +84,13 @@ export namespace GIT_COMMANDS {
     export const COMMIT = {
         id: 'git.commit.all',
         tooltip: 'Commit all the staged changes',
-        iconClass: 'fa fa-check',
+        iconClass: 'codicon codicon-check',
         label: 'Commit',
     };
     export const COMMIT_ADD_SIGN_OFF = {
         id: 'git-commit-add-sign-off',
         label: 'Add Signed-off-by',
-        iconClass: 'fa fa-pencil-square-o',
+        iconClass: 'codicon codicon-pencil',
         category: 'Git'
     };
     export const COMMIT_AMEND = {
@@ -194,7 +194,7 @@ export namespace GIT_COMMANDS {
     export const REFRESH = {
         id: 'git-refresh',
         label: 'Refresh',
-        iconClass: 'fa fa-refresh',
+        iconClass: 'codicon codicon-refresh',
         category: 'Git'
     };
     export const INIT_REPOSITORY = {
