@@ -198,7 +198,7 @@ describe.only('Monaco API', async function () {
 
             it('should normalize colors with different notations', () => {
                 assert.equal(themeRegistry['normalizeColor']('#FC0'), '#FFCC00');
-                assert.equal(themeRegistry['normalizeColor']('#FC0C'), '#FFCC00CC');
+                assert.equal(themeRegistry['normalizeColor']('#FC0C'), '#FFCC00');
                 assert.equal(themeRegistry['normalizeColor']('#FFCC00'), '#FFCC00');
             });
 

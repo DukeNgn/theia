@@ -144,12 +144,13 @@ export class MonacoThemeRegistry {
         const length = hex.length;
 
         // #RRGGBB notation.
-        if (length === 7 && hex.match(/#[A-Fa-f0-9]{6}/)) {
+        if (length === 7 && hex.match(/^#[A-Fa-f0-9]{6}$/)) {
             return hex;
         }
 
         // #RRGGBBAA notation.
-        if (length === 9 && hex.match(/#[A-Fa-f0-9]{8}/)) {
+        // Ignoring Alpha value to avoid breaking token color indexes between monaco and vscode-textmate.
+        if (length === 9 && hex.match(/^#[A-Fa-f0-9]{8}$/)) {
             const r = hex.charAt(1);
             const g = hex.charAt(3);
             const b = hex.charAt(5);
@@ -157,7 +158,7 @@ export class MonacoThemeRegistry {
         }
 
         // #RGB notation.
-        if (length === 4 && hex.match(/#[A-Fa-f0-9]{3}/)) {
+        if (length === 4 && hex.match(/^#[A-Fa-f0-9]{3}$/)) {
             const r = hex.charAt(1);
             const g = hex.charAt(2);
             const b = hex.charAt(3);
@@ -165,17 +166,16 @@ export class MonacoThemeRegistry {
         }
 
         // #RGBA notation.
-        if (length === 5 && hex.match(/#[A-Fa-f0-9]{4}/)) {
+        // Ignoring Alpha value to avoid breaking token color indexes between monaco and vscode-textmate.
+        if (length === 5 && hex.match(/^#[A-Fa-f0-9]{4}$/)) {
             const r = hex.charAt(1);
             const g = hex.charAt(2);
             const b = hex.charAt(3);
-            const a = hex.charAt(4);
-            return '#' + r + r + g + g + b + b + a + a;
+            return '#' + r + r + g + g + b + b;
         }
 
         console.error(`Color '${hex}' cannot be normalized.`);
         return undefined;
-
     }
 }
 
