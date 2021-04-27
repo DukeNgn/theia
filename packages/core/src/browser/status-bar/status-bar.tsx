@@ -17,10 +17,17 @@
 import * as React from 'react';
 import { injectable, inject } from 'inversify';
 import Octicon, { getIconByName } from '@primer/octicons-react';
-import { CommandService } from '../../common';
+import {
+    CommandRegistry,
+    CommandService,
+    MenuAction,
+    MenuPath,
+    MenuModelRegistry
+} from '../../common';
 import { ReactWidget } from '../widgets/react-widget';
 import { FrontendApplicationStateService } from '../frontend-application-state';
 import { LabelParser, LabelIcon } from '../label-parser';
+import { ContextMenuRenderer } from '../context-menu-renderer';
 
 export interface StatusBarEntry {
     /**
@@ -43,6 +50,7 @@ export interface StatusBarEntry {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     arguments?: any[];
     priority?: number;
+    canHide?: boolean;
     onclick?: (e: MouseEvent) => void;
 }
 
@@ -74,16 +82,24 @@ export class StatusBarImpl extends ReactWidget implements StatusBar {
     protected backgroundColor: string | undefined;
     protected color: string | undefined;
     protected entries: Map<string, StatusBarEntry> = new Map();
+    protected hidden: Set<string>;
+    protected registeredID: Set<string>;
+    protected readonly contextMenuPath: MenuPath = ['statusbar_context_menu'];
 
     constructor(
         @inject(CommandService) protected readonly commands: CommandService,
         @inject(LabelParser) protected readonly entryService: LabelParser,
-        @inject(FrontendApplicationStateService) protected readonly applicationStateService: FrontendApplicationStateService
+        @inject(FrontendApplicationStateService) protected readonly applicationStateService: FrontendApplicationStateService,
+        @inject(CommandRegistry) protected readonly commandRegistry: CommandRegistry,
+        @inject(ContextMenuRenderer) protected readonly contextMenuRenderer: ContextMenuRenderer,
+        @inject(MenuModelRegistry) protected readonly menuRegistry: MenuModelRegistry
     ) {
         super();
         delete this.scrollOptions;
         this.id = 'theia-statusBar';
         this.addClass('noselect');
+        this.hidden = new Set();
+        this.registeredID = new Set();
     }
 
     protected get ready(): Promise<void> {
@@ -93,13 +109,56 @@ export class StatusBarImpl extends ReactWidget implements StatusBar {
     async setElement(id: string, entry: StatusBarEntry): Promise<void> {
         await this.ready;
         this.entries.set(id, entry);
+        this.registerEntry(id, entry);
         this.update();
     }
 
     async removeElement(id: string): Promise<void> {
         await this.ready;
         this.entries.delete(id);
+        this.unregisterEntry(id);
         this.update();
+    }
+
+    async toggleItemVisibility(id: string): Promise<void> {
+        await this.ready;
+        // eslint-disable-next-line no-unused-expressions
+        this.hidden.has(id) ? this.hidden.delete(id) : this.hidden.add(id);
+        this.update();
+    }
+
+    protected toggleVisibilityCommandId(id: string): string {
+        return `${this.id}:toggle-statusbar-visibility-${id}`;
+    }
+
+    protected registerEntry(id: string, toRegister: StatusBarEntry): void {
+        const commandId = this.toggleVisibilityCommandId(id);
+        if (this.registeredID.has(commandId)) {
+            this.unregisterEntry(id);
+        }
+        console.error(`ID: ${id} has command id ${commandId}`);
+        this.commandRegistry.registerCommand({ id: commandId }, {
+            execute: () => this.toggleItemVisibility(id),
+            isEnabled: () => toRegister.canHide === undefined ? true : toRegister.canHide
+        });
+        this.registerEntryMenuAction(id);
+        this.registeredID.add(commandId);
+    }
+
+    protected registerEntryMenuAction(id: string): void {
+        const entry = this.entries.get(id);
+        const commandId = this.toggleVisibilityCommandId(id);
+        const entryAction: MenuAction = {
+            commandId,
+            label: entry?.tooltip
+        };
+        this.menuRegistry.registerMenuAction([...this.contextMenuPath, '1_items'], entryAction);
+    }
+
+    protected unregisterEntry(id: string): void {
+        const commandId = this.toggleVisibilityCommandId(id);
+        this.commandRegistry.unregisterCommand(commandId);
+        this.menuRegistry.unregisterMenuAction(commandId);
     }
 
     async setBackgroundColor(color?: string): Promise<void> {
@@ -123,6 +182,20 @@ export class StatusBarImpl extends ReactWidget implements StatusBar {
         this.color = color;
     }
 
+    protected renderContextMenu = (e: React.MouseEvent<HTMLElement>) => {
+        console.log('Context menu is called');
+        e.preventDefault();
+        if (e.button === 2) {
+            this.contextMenuRenderer.render({
+                menuPath: this.contextMenuPath,
+                anchor: {
+                    x: e.clientX,
+                    y: e.clientY
+                },
+            });
+        }
+    };
+
     protected render(): JSX.Element {
         const leftEntries: JSX.Element[] = [];
         const rightEntries: JSX.Element[] = [];
@@ -132,6 +205,9 @@ export class StatusBarImpl extends ReactWidget implements StatusBar {
             return rp - lp;
         });
         elements.forEach(([id, entry]) => {
+            if (this.hidden.has(id)) {
+                return;
+            }
             if (entry.alignment === StatusBarAlignment.LEFT) {
                 leftEntries.push(this.renderElement(id, entry));
             } else {
@@ -140,9 +216,9 @@ export class StatusBarImpl extends ReactWidget implements StatusBar {
         });
 
         return <React.Fragment>
-            <div className='area left'>{leftEntries}</div>
-            <div className='area right'>{rightEntries}</div>
-        </React.Fragment>;
+            <div onContextMenu={this.renderContextMenu} className='area left'>{leftEntries}</div>
+            <div onContextMenu={this.renderContextMenu} className='area right'>{rightEntries}</div>
+        </React.Fragment >;
     }
 
     protected onclick(entry: StatusBarEntry): () => void {
